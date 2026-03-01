@@ -2,6 +2,8 @@
 
 基于 Go + Gin + MCP SDK + Rod 的闲鱼 MCP 服务（首版已实现登录相关能力）。
 
+AI Agent 专用说明见：`AI_USAGE.md`
+
 ## 已实现
 
 - `check_login_status`：检查闲鱼登录状态
