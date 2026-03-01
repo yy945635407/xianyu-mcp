@@ -47,6 +47,10 @@ func setupRoutes(appServer *AppServer) *gin.Engine {
 		api.GET("/collections/list", appServer.listCollectionsHandler)
 		api.POST("/collections/cancel", appServer.cancelFavoriteHandler)
 		api.POST("/collections/groups/manage", appServer.manageCollectionGroupHandler)
+		api.GET("/my/items", appServer.listMyItemsHandler)
+		api.POST("/my/items/edit", appServer.editMyItemHandler)
+		api.POST("/my/items/shelf", appServer.shelfMyItemHandler)
+		api.POST("/my/items/delete", appServer.deleteMyItemHandler)
 	}
 
 	return router

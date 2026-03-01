@@ -152,3 +152,38 @@ type ListCollectionsResponse struct {
 type CollectionActionResponse struct {
 	Result xianyu.CollectionActionResult `json:"result"`
 }
+
+type ListMyItemsRequest struct {
+	Tab   string `json:"tab,omitempty"` // 在售|已售出|下架
+	Limit int    `json:"limit,omitempty"`
+}
+
+type EditMyItemRequest struct {
+	Keyword     string `json:"keyword,omitempty"`
+	ItemRef     string `json:"item_ref,omitempty"` // 商品链接或商品ID
+	Tab         string `json:"tab,omitempty"`      // 在售|已售出|下架
+	Price       string `json:"price,omitempty"`
+	Description string `json:"description,omitempty"`
+	Submit      bool   `json:"submit,omitempty"` // 是否点击保存/发布
+}
+
+type ShelfMyItemRequest struct {
+	Keyword string `json:"keyword,omitempty"`
+	ItemRef string `json:"item_ref,omitempty"`
+	Tab     string `json:"tab,omitempty"`
+	Action  string `json:"action,omitempty"` // up|down|auto
+}
+
+type DeleteMyItemRequest struct {
+	Keyword string `json:"keyword,omitempty"`
+	ItemRef string `json:"item_ref,omitempty"`
+	Tab     string `json:"tab,omitempty"`
+}
+
+type ListMyItemsResponse struct {
+	Result xianyu.MyItemListResult `json:"result"`
+}
+
+type MyItemActionResponse struct {
+	Result xianyu.MyItemActionResult `json:"result"`
+}

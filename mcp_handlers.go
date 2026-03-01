@@ -289,6 +289,82 @@ func (s *AppServer) handleManageCollectionGroup(ctx context.Context, req ManageC
 	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
 }
 
+func (s *AppServer) handleListMyItems(ctx context.Context, tab string, limit int) *MCPToolResult {
+	result, err := s.xianyuService.ListMyItems(ctx, tab, limit)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "读取我的宝贝失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "读取成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleEditMyItem(ctx context.Context, req EditMyItemRequest) *MCPToolResult {
+	result, err := s.xianyuService.EditMyItem(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "编辑宝贝失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "编辑执行完成但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleShelfMyItem(ctx context.Context, req ShelfMyItemRequest) *MCPToolResult {
+	result, err := s.xianyuService.ShelfMyItem(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "上下架操作失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "上下架执行完成但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleDeleteMyItem(ctx context.Context, req DeleteMyItemRequest) *MCPToolResult {
+	result, err := s.xianyuService.DeleteMyItem(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "删除宝贝失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "删除执行完成但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
 func normalizeQRCodeData(img string) string {
 	trimmed := strings.TrimSpace(img)
 	trimmed = strings.TrimPrefix(trimmed, "data:image/png;base64,")

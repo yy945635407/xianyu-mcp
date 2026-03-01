@@ -340,6 +340,89 @@ func (s *XianyuService) ManageCollectionGroup(ctx context.Context, req *ManageCo
 	}, nil
 }
 
+func (s *XianyuService) ListMyItems(ctx context.Context, tab string, limit int) (*ListMyItemsResponse, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 20
+	}
+
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewMyItemsAction(page)
+	result, err := action.ListMyItems(ctx, tab, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ListMyItemsResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) EditMyItem(ctx context.Context, req *EditMyItemRequest) (*MyItemActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewMyItemsAction(page)
+	result, err := action.EditMyItem(ctx, xianyu.EditMyItemParams{
+		Keyword:     req.Keyword,
+		ItemRef:     req.ItemRef,
+		Tab:         req.Tab,
+		Price:       req.Price,
+		Description: req.Description,
+		Submit:      req.Submit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &MyItemActionResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) ShelfMyItem(ctx context.Context, req *ShelfMyItemRequest) (*MyItemActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewMyItemsAction(page)
+	result, err := action.ShelfMyItem(ctx, req.Keyword, req.ItemRef, req.Tab, req.Action)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MyItemActionResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) DeleteMyItem(ctx context.Context, req *DeleteMyItemRequest) (*MyItemActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewMyItemsAction(page)
+	result, err := action.DeleteMyItem(ctx, req.Keyword, req.ItemRef, req.Tab)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MyItemActionResponse{
+		Result: *result,
+	}, nil
+}
+
 func newBrowser() *headless_browser.Browser {
 	return browser.NewBrowser(configs.IsHeadless(), browser.WithBinPath(configs.GetBinPath()))
 }

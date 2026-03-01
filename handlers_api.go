@@ -318,6 +318,91 @@ func (s *AppServer) manageCollectionGroupHandler(c *gin.Context) {
 	respondSuccess(c, result, "分组管理执行完成")
 }
 
+func (s *AppServer) listMyItemsHandler(c *gin.Context) {
+	tab := c.Query("tab")
+	limit := 20
+	if limitStr := c.Query("limit"); limitStr != "" {
+		parsed, err := strconv.Atoi(limitStr)
+		if err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "limit 必须是整数", err.Error())
+			return
+		}
+		limit = parsed
+	}
+
+	result, err := s.xianyuService.ListMyItems(c.Request.Context(), tab, limit)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "LIST_MY_ITEMS_FAILED", "读取我的宝贝失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "读取我的宝贝成功")
+}
+
+func (s *AppServer) editMyItemHandler(c *gin.Context) {
+	var req EditMyItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if req.Keyword == "" && req.ItemRef == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_PARAMS", "缺少参数", "keyword or item_ref is required")
+		return
+	}
+
+	result, err := s.xianyuService.EditMyItem(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "EDIT_MY_ITEM_FAILED", "编辑宝贝失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "编辑宝贝执行完成")
+}
+
+func (s *AppServer) shelfMyItemHandler(c *gin.Context) {
+	var req ShelfMyItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if req.Keyword == "" && req.ItemRef == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_PARAMS", "缺少参数", "keyword or item_ref is required")
+		return
+	}
+
+	result, err := s.xianyuService.ShelfMyItem(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "SHELF_MY_ITEM_FAILED", "上下架操作失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "上下架操作执行完成")
+}
+
+func (s *AppServer) deleteMyItemHandler(c *gin.Context) {
+	var req DeleteMyItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if req.Keyword == "" && req.ItemRef == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_PARAMS", "缺少参数", "keyword or item_ref is required")
+		return
+	}
+
+	result, err := s.xianyuService.DeleteMyItem(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "DELETE_MY_ITEM_FAILED", "删除宝贝失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "删除宝贝执行完成")
+}
+
 func healthHandler(c *gin.Context) {
 	respondSuccess(c, map[string]any{
 		"status":    "healthy",

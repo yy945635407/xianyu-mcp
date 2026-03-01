@@ -77,6 +77,33 @@ type ManageCollectionGroupArgs struct {
 	ItemKeyword string `json:"item_keyword,omitempty" jsonschema:"商品关键字（move 需要）"`
 }
 
+type ListMyItemsArgs struct {
+	Tab   string `json:"tab,omitempty" jsonschema:"页签：在售|已售出|下架"`
+	Limit int    `json:"limit,omitempty" jsonschema:"返回条数限制，默认20"`
+}
+
+type EditMyItemArgs struct {
+	Keyword     string `json:"keyword,omitempty" jsonschema:"商品标题关键字（与 item_ref 至少一个）"`
+	ItemRef     string `json:"item_ref,omitempty" jsonschema:"商品链接或商品ID（与 keyword 至少一个）"`
+	Tab         string `json:"tab,omitempty" jsonschema:"页签：在售|已售出|下架"`
+	Price       string `json:"price,omitempty" jsonschema:"新价格（可选）"`
+	Description string `json:"description,omitempty" jsonschema:"新描述（可选）"`
+	Submit      bool   `json:"submit,omitempty" jsonschema:"是否尝试点击保存/发布"`
+}
+
+type ShelfMyItemArgs struct {
+	Keyword string `json:"keyword,omitempty" jsonschema:"商品标题关键字（与 item_ref 至少一个）"`
+	ItemRef string `json:"item_ref,omitempty" jsonschema:"商品链接或商品ID（与 keyword 至少一个）"`
+	Tab     string `json:"tab,omitempty" jsonschema:"页签：在售|已售出|下架"`
+	Action  string `json:"action,omitempty" jsonschema:"操作：up|down|auto"`
+}
+
+type DeleteMyItemArgs struct {
+	Keyword string `json:"keyword,omitempty" jsonschema:"商品标题关键字（与 item_ref 至少一个）"`
+	ItemRef string `json:"item_ref,omitempty" jsonschema:"商品链接或商品ID（与 keyword 至少一个）"`
+	Tab     string `json:"tab,omitempty" jsonschema:"页签：在售|已售出|下架"`
+}
+
 func InitMCPServer(appServer *AppServer) *mcp.Server {
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -349,7 +376,89 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 14 MCP tools")
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "list_my_items",
+			Description: "读取我发布的商品列表，支持在售/已售出/下架页签",
+			Annotations: &mcp.ToolAnnotations{Title: "List My Items", ReadOnlyHint: true},
+		},
+		withPanicRecovery("list_my_items", func(ctx context.Context, req *mcp.CallToolRequest, args ListMyItemsArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleListMyItems(ctx, args.Tab, args.Limit)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "edit_my_item",
+			Description: "编辑我发布的商品（先定位商品，再进入编辑页填充价格/描述）",
+			Annotations: &mcp.ToolAnnotations{Title: "Edit My Item", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("edit_my_item", func(ctx context.Context, req *mcp.CallToolRequest, args EditMyItemArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Keyword) == "" && strings.TrimSpace(args.ItemRef) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 keyword 或 item_ref 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleEditMyItem(ctx, EditMyItemRequest{
+				Keyword:     args.Keyword,
+				ItemRef:     args.ItemRef,
+				Tab:         args.Tab,
+				Price:       args.Price,
+				Description: args.Description,
+				Submit:      args.Submit,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "shelf_my_item",
+			Description: "对我发布的商品执行上架/下架（action=up|down|auto）",
+			Annotations: &mcp.ToolAnnotations{Title: "Shelf My Item", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("shelf_my_item", func(ctx context.Context, req *mcp.CallToolRequest, args ShelfMyItemArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Keyword) == "" && strings.TrimSpace(args.ItemRef) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 keyword 或 item_ref 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleShelfMyItem(ctx, ShelfMyItemRequest{
+				Keyword: args.Keyword,
+				ItemRef: args.ItemRef,
+				Tab:     args.Tab,
+				Action:  args.Action,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "delete_my_item",
+			Description: "删除我发布的商品",
+			Annotations: &mcp.ToolAnnotations{Title: "Delete My Item", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("delete_my_item", func(ctx context.Context, req *mcp.CallToolRequest, args DeleteMyItemArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Keyword) == "" && strings.TrimSpace(args.ItemRef) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 keyword 或 item_ref 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleDeleteMyItem(ctx, DeleteMyItemRequest{
+				Keyword: args.Keyword,
+				ItemRef: args.ItemRef,
+				Tab:     args.Tab,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Info("Registered 18 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {
