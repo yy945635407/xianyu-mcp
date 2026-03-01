@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -174,24 +175,110 @@ func (s *XianyuService) GetConversationMessages(ctx context.Context, username st
 }
 
 func (s *XianyuService) SendMessage(ctx context.Context, username, message string, limit int) (*SendMessageResponse, error) {
-	b := newBrowser()
-	defer b.Close()
+	return s.SendMessageWithRequest(ctx, &SendMessageRequest{
+		Username: username,
+		Message:  message,
+		Limit:    limit,
+	})
+}
 
-	page := b.NewPage()
-	defer page.Close()
+func (s *XianyuService) SendMessageWithRequest(ctx context.Context, req *SendMessageRequest) (*SendMessageResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("send message request is required")
+	}
+	username := req.Username
+	message := req.Message
+	limit := req.Limit
+	clientMsgID := req.ClientMsgID
 
-	action := xianyu.NewMessageAction(page)
-	detail, err := action.SendMessageToUser(ctx, username, message, limit)
-	if err != nil {
-		return nil, err
+	if !req.Force {
+		if sessionStore, err := getIMSessionStore(); err == nil {
+			allowed, reason := sessionStore.CheckSendPermission(username, time.Now().UnixMilli())
+			if !allowed {
+				return &SendMessageResponse{
+					Username:    username,
+					Message:     message,
+					Sent:        false,
+					ClientMsgID: clientMsgID,
+					Blocked:     true,
+					BlockReason: reason,
+				}, nil
+			}
+		} else {
+			logrus.Warnf("load session store failed when checking send permission: %v", err)
+		}
 	}
 
-	return &SendMessageResponse{
-		Username:     username,
-		Message:      message,
-		Sent:         true,
-		Conversation: *detail,
-	}, nil
+	recordStore, recErr := getIMSendRecordStore()
+	if recErr != nil {
+		logrus.Warnf("load send record store failed: %v", recErr)
+		recordStore = nil
+	}
+
+	if recordStore != nil && strings.TrimSpace(clientMsgID) != "" {
+		if rec, ok := recordStore.Get(clientMsgID); ok {
+			if rec.Username == strings.TrimSpace(username) && rec.Message == message && rec.Sent {
+				resp := rec.Response
+				resp.Deduplicated = true
+				resp.ClientMsgID = clientMsgID
+				if resp.Attempts == 0 {
+					resp.Attempts = rec.Attempts
+				}
+				return &resp, nil
+			}
+			if rec.Username != strings.TrimSpace(username) || rec.Message != message {
+				return nil, fmt.Errorf("client_msg_id already used with different payload")
+			}
+		}
+	}
+
+	maxAttempts := req.MaxRetries
+	if maxAttempts <= 0 {
+		maxAttempts = 2
+	}
+	if maxAttempts > 5 {
+		maxAttempts = 5
+	}
+
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		b := newBrowser()
+		page := b.NewPage()
+
+		action := xianyu.NewMessageAction(page)
+		detail, err := action.SendMessageToUser(ctx, username, message, limit)
+		_ = page.Close()
+		b.Close()
+		if err == nil {
+			resp := &SendMessageResponse{
+				Username:     username,
+				Message:      message,
+				Sent:         true,
+				ClientMsgID:  clientMsgID,
+				Attempts:     attempt,
+				Conversation: *detail,
+			}
+			if recordStore != nil {
+				if e := recordStore.SaveSuccess(clientMsgID, username, message, attempt, resp); e != nil {
+					logrus.Warnf("save send success record failed: %v", e)
+				}
+			}
+			return resp, nil
+		}
+
+		lastErr = err
+		if attempt < maxAttempts {
+			time.Sleep(time.Duration(attempt) * 700 * time.Millisecond)
+		}
+	}
+
+	if recordStore != nil {
+		if e := recordStore.SaveFailure(clientMsgID, username, message, maxAttempts, fmt.Sprintf("%v", lastErr)); e != nil {
+			logrus.Warnf("save send failure record failed: %v", e)
+		}
+	}
+
+	return nil, lastErr
 }
 
 func (s *XianyuService) PullIMEvents(ctx context.Context, req *PullIMEventsRequest) (*PullIMEventsResponse, error) {

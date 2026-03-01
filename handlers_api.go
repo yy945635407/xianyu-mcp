@@ -298,13 +298,21 @@ func (s *AppServer) sendMessageHandler(c *gin.Context) {
 		return
 	}
 
-	result, err := s.xianyuService.SendMessage(c.Request.Context(), req.Username, req.Message, req.Limit)
+	result, err := s.xianyuService.SendMessageWithRequest(c.Request.Context(), &req)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "SEND_MESSAGE_FAILED", "发送消息失败", err.Error())
 		return
 	}
 
 	c.Set("account", "xianyu-mcp")
+	if result.Blocked {
+		respondSuccess(c, result, "发送被会话状态策略阻止")
+		return
+	}
+	if result.Deduplicated {
+		respondSuccess(c, result, "幂等去重命中，未重复发送")
+		return
+	}
 	respondSuccess(c, result, "发送消息成功")
 }
 

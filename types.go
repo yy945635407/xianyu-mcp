@@ -67,9 +67,12 @@ type GetMessagesRequest struct {
 }
 
 type SendMessageRequest struct {
-	Username string `json:"username" binding:"required"`
-	Message  string `json:"message" binding:"required"`
-	Limit    int    `json:"limit,omitempty"`
+	Username    string `json:"username" binding:"required"`
+	Message     string `json:"message" binding:"required"`
+	Limit       int    `json:"limit,omitempty"`
+	ClientMsgID string `json:"client_msg_id,omitempty"`
+	MaxRetries  int    `json:"max_retries,omitempty"`
+	Force       bool   `json:"force,omitempty"`
 }
 
 type PullIMEventsRequest struct {
@@ -91,6 +94,11 @@ type SendMessageResponse struct {
 	Username     string                    `json:"username"`
 	Message      string                    `json:"message"`
 	Sent         bool                      `json:"sent"`
+	ClientMsgID  string                    `json:"client_msg_id,omitempty"`
+	Attempts     int                       `json:"attempts,omitempty"`
+	Deduplicated bool                      `json:"deduplicated,omitempty"`
+	Blocked      bool                      `json:"blocked,omitempty"`
+	BlockReason  string                    `json:"block_reason,omitempty"`
 	Conversation xianyu.ConversationDetail `json:"conversation"`
 }
 

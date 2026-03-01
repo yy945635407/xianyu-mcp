@@ -56,9 +56,12 @@ type MarkIMSessionReadArgs struct {
 }
 
 type SendMessageArgs struct {
-	Username string `json:"username" jsonschema:"会话用户名"`
-	Message  string `json:"message" jsonschema:"要发送的消息内容"`
-	Limit    int    `json:"limit,omitempty" jsonschema:"发送后返回最近消息条数限制，默认30"`
+	Username    string `json:"username" jsonschema:"会话用户名"`
+	Message     string `json:"message" jsonschema:"要发送的消息内容"`
+	Limit       int    `json:"limit,omitempty" jsonschema:"发送后返回最近消息条数限制，默认30"`
+	ClientMsgID string `json:"client_msg_id,omitempty" jsonschema:"客户端消息ID，用于幂等去重"`
+	MaxRetries  int    `json:"max_retries,omitempty" jsonschema:"发送最大重试次数，默认2，最大5"`
+	Force       bool   `json:"force,omitempty" jsonschema:"是否忽略会话锁/人工模式强制发送"`
 }
 
 type PublishItemArgs struct {
@@ -410,7 +413,7 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 	mcp.AddTool(server,
 		&mcp.Tool{
 			Name:        "send_message",
-			Description: "按用户名发送消息，并返回发送后会话摘要",
+			Description: "按用户名发送消息（支持幂等 client_msg_id 与重试），并返回发送后会话摘要",
 			Annotations: &mcp.ToolAnnotations{Title: "Send Message", DestructiveHint: boolPtr(true)},
 		},
 		withPanicRecovery("send_message", func(ctx context.Context, req *mcp.CallToolRequest, args SendMessageArgs) (*mcp.CallToolResult, any, error) {
@@ -420,7 +423,14 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 username 或 message 参数"}},
 				}, nil, nil
 			}
-			result := appServer.handleSendMessage(ctx, args.Username, args.Message, args.Limit)
+			result := appServer.handleSendMessage(ctx, SendMessageRequest{
+				Username:    args.Username,
+				Message:     args.Message,
+				Limit:       args.Limit,
+				ClientMsgID: args.ClientMsgID,
+				MaxRetries:  args.MaxRetries,
+				Force:       args.Force,
+			})
 			return convertToMCPResult(result), nil, nil
 		}),
 	)

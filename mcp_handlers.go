@@ -232,8 +232,8 @@ func (s *AppServer) handleMarkIMSessionRead(ctx context.Context, req MarkIMSessi
 	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
 }
 
-func (s *AppServer) handleSendMessage(ctx context.Context, username, message string, limit int) *MCPToolResult {
-	result, err := s.xianyuService.SendMessage(ctx, username, message, limit)
+func (s *AppServer) handleSendMessage(ctx context.Context, req SendMessageRequest) *MCPToolResult {
+	result, err := s.xianyuService.SendMessageWithRequest(ctx, &req)
 	if err != nil {
 		return &MCPToolResult{
 			Content: []MCPContent{{Type: "text", Text: "发送消息失败: " + err.Error()}},
