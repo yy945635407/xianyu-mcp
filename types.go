@@ -216,3 +216,33 @@ type ItemOperateResponse struct {
 type AccountSecurityResponse struct {
 	Result xianyu.AccountSecurityInfo `json:"result"`
 }
+
+type CommunityFeedRequest struct {
+	Keyword string `json:"keyword,omitempty"`
+	Limit   int    `json:"limit,omitempty"`
+}
+
+type InteractCommunityRequest struct {
+	Keyword string `json:"keyword" binding:"required"`
+	Action  string `json:"action,omitempty"` // open_item|open_category
+}
+
+type OpenCustomerServiceRequest struct {
+	Name string `json:"name,omitempty"` // 客服|反馈
+}
+
+type CustomerServiceRequest struct {
+	AfterSaleLimit int `json:"after_sale_limit,omitempty"`
+}
+
+type CommunityFeedResponse struct {
+	Result xianyu.CommunityFeedResult `json:"result"`
+}
+
+type CommunityActionResponse struct {
+	Result xianyu.CommunityActionResult `json:"result"`
+}
+
+type CustomerServiceResponse struct {
+	Result xianyu.CustomerServiceResult `json:"result"`
+}

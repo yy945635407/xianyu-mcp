@@ -123,6 +123,24 @@ type BuyItemArgs struct {
 
 type GetAccountSecurityArgs struct{}
 
+type GetCommunityFeedArgs struct {
+	Keyword string `json:"keyword,omitempty" jsonschema:"按关键词筛选社区推荐内容"`
+	Limit   int    `json:"limit,omitempty" jsonschema:"返回条数限制，默认20"`
+}
+
+type InteractCommunityArgs struct {
+	Keyword string `json:"keyword" jsonschema:"社区互动关键词（类目或内容关键字）"`
+	Action  string `json:"action,omitempty" jsonschema:"互动动作：open_item|open_category"`
+}
+
+type GetCustomerServiceArgs struct {
+	AfterSaleLimit int `json:"after_sale_limit,omitempty" jsonschema:"退款中记录返回条数限制，默认20"`
+}
+
+type OpenCustomerServiceArgs struct {
+	Name string `json:"name,omitempty" jsonschema:"入口名称：客服|反馈（默认客服）"`
+}
+
 func InitMCPServer(appServer *AppServer) *mcp.Server {
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -564,7 +582,66 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 23 MCP tools")
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_community_feed",
+			Description: "读取首页社区/推荐内容（类目与推荐商品）",
+			Annotations: &mcp.ToolAnnotations{Title: "Get Community Feed", ReadOnlyHint: true},
+		},
+		withPanicRecovery("get_community_feed", func(ctx context.Context, req *mcp.CallToolRequest, args GetCommunityFeedArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleGetCommunityFeed(ctx, args.Keyword, args.Limit)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "interact_community",
+			Description: "对社区入口执行互动动作（打开分类或推荐商品）",
+			Annotations: &mcp.ToolAnnotations{Title: "Interact Community", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("interact_community", func(ctx context.Context, req *mcp.CallToolRequest, args InteractCommunityArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Keyword) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 keyword 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleInteractCommunity(ctx, InteractCommunityRequest{
+				Keyword: args.Keyword,
+				Action:  args.Action,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_customer_service",
+			Description: "读取客服入口与退款中售后记录",
+			Annotations: &mcp.ToolAnnotations{Title: "Get Customer Service", ReadOnlyHint: true},
+		},
+		withPanicRecovery("get_customer_service", func(ctx context.Context, req *mcp.CallToolRequest, args GetCustomerServiceArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleGetCustomerService(ctx, args.AfterSaleLimit)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "open_customer_service",
+			Description: "打开客服或反馈入口",
+			Annotations: &mcp.ToolAnnotations{Title: "Open Customer Service", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("open_customer_service", func(ctx context.Context, req *mcp.CallToolRequest, args OpenCustomerServiceArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleOpenCustomerService(ctx, OpenCustomerServiceRequest{
+				Name: args.Name,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Info("Registered 27 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {

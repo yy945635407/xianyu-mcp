@@ -494,6 +494,87 @@ func (s *AppServer) getAccountSecurityHandler(c *gin.Context) {
 	respondSuccess(c, result, "读取账号与安全信息成功")
 }
 
+func (s *AppServer) getCommunityFeedHandler(c *gin.Context) {
+	keyword := c.Query("keyword")
+	limit := 20
+	if limitStr := c.Query("limit"); limitStr != "" {
+		parsed, err := strconv.Atoi(limitStr)
+		if err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "limit 必须是整数", err.Error())
+			return
+		}
+		limit = parsed
+	}
+
+	result, err := s.xianyuService.GetCommunityFeed(c.Request.Context(), keyword, limit)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "GET_COMMUNITY_FEED_FAILED", "读取社区内容失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "读取社区内容成功")
+}
+
+func (s *AppServer) interactCommunityHandler(c *gin.Context) {
+	var req InteractCommunityRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if req.Keyword == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_KEYWORD", "缺少关键词参数", "keyword is required")
+		return
+	}
+
+	result, err := s.xianyuService.InteractCommunity(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "INTERACT_COMMUNITY_FAILED", "社区互动失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "社区互动执行完成")
+}
+
+func (s *AppServer) getCustomerServiceHandler(c *gin.Context) {
+	afterSaleLimit := 20
+	if limitStr := c.Query("after_sale_limit"); limitStr != "" {
+		parsed, err := strconv.Atoi(limitStr)
+		if err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "after_sale_limit 必须是整数", err.Error())
+			return
+		}
+		afterSaleLimit = parsed
+	}
+
+	result, err := s.xianyuService.GetCustomerService(c.Request.Context(), afterSaleLimit)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "GET_CUSTOMER_SERVICE_FAILED", "读取客服/售后信息失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "读取客服/售后信息成功")
+}
+
+func (s *AppServer) openCustomerServiceHandler(c *gin.Context) {
+	var req OpenCustomerServiceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+
+	result, err := s.xianyuService.OpenCustomerService(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "OPEN_CUSTOMER_SERVICE_FAILED", "打开客服入口失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "打开客服入口执行完成")
+}
+
 func healthHandler(c *gin.Context) {
 	respondSuccess(c, map[string]any{
 		"status":    "healthy",

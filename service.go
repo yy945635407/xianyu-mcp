@@ -513,6 +513,78 @@ func (s *XianyuService) GetAccountSecurity(ctx context.Context) (*AccountSecurit
 	}, nil
 }
 
+func (s *XianyuService) GetCommunityFeed(ctx context.Context, keyword string, limit int) (*CommunityFeedResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewCommunityServiceAction(page)
+	result, err := action.GetCommunityFeed(ctx, keyword, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CommunityFeedResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) InteractCommunity(ctx context.Context, req *InteractCommunityRequest) (*CommunityActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewCommunityServiceAction(page)
+	result, err := action.InteractCommunity(ctx, req.Keyword, req.Action)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CommunityActionResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) GetCustomerService(ctx context.Context, afterSaleLimit int) (*CustomerServiceResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewCommunityServiceAction(page)
+	result, err := action.GetCustomerService(ctx, afterSaleLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CustomerServiceResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) OpenCustomerService(ctx context.Context, req *OpenCustomerServiceRequest) (*CommunityActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewCommunityServiceAction(page)
+	result, err := action.OpenCustomerService(ctx, req.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CommunityActionResponse{
+		Result: *result,
+	}, nil
+}
+
 func newBrowser() *headless_browser.Browser {
 	return browser.NewBrowser(configs.IsHeadless(), browser.WithBinPath(configs.GetBinPath()))
 }
