@@ -22,3 +22,22 @@ go run . -headless=false -port=:18061
 ```
 
 MCP 地址：`http://localhost:18061/mcp`
+
+## 浏览器探索调试
+
+使用可见浏览器抓取当前登录态下的关键入口和候选能力：
+
+```bash
+go run ./cmd/explore
+```
+
+## 已验证可开发方向
+
+- 发布闲置（`/publish`）
+- 搜索商品与筛选（`/search`）
+- 我的闲鱼页数据（`/personal`）
+- 会话消息读取（`/im`）
+- 订单查询（`/bought`）
+- 收藏夹读取（`/collection`）
+- 账号与安全信息读取（`/account`）
+- 商品详情与动作（聊一聊/立即购买/收藏）
