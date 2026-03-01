@@ -24,6 +24,18 @@ type XianyuService struct {
 	pullMu         sync.Mutex
 	lastIMScanAt   time.Time
 	minIMScanEvery time.Duration
+
+	autoCtxMu              sync.Mutex
+	autoCtxByUser          map[string]autoContextSnapshot
+	autoCtxRefreshInterval time.Duration
+	autoCtxCacheTTL        time.Duration
+}
+
+type autoContextSnapshot struct {
+	ItemRef     string
+	OrderStatus string
+	UpdatedAt   time.Time
+	LastAttempt time.Time
 }
 
 func NewXianyuService() *XianyuService {
@@ -33,8 +45,25 @@ func NewXianyuService() *XianyuService {
 			minInterval = time.Duration(v) * time.Millisecond
 		}
 	}
+
+	autoCtxRefresh := 3 * time.Minute
+	if raw := strings.TrimSpace(os.Getenv("XIANYU_AUTOCTX_REFRESH_SEC")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v >= 30 {
+			autoCtxRefresh = time.Duration(v) * time.Second
+		}
+	}
+	autoCtxTTL := 15 * time.Minute
+	if raw := strings.TrimSpace(os.Getenv("XIANYU_AUTOCTX_TTL_SEC")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v >= 60 {
+			autoCtxTTL = time.Duration(v) * time.Second
+		}
+	}
+
 	return &XianyuService{
-		minIMScanEvery: minInterval,
+		minIMScanEvery:         minInterval,
+		autoCtxByUser:          map[string]autoContextSnapshot{},
+		autoCtxRefreshInterval: autoCtxRefresh,
+		autoCtxCacheTTL:        autoCtxTTL,
 	}
 }
 
@@ -51,6 +80,54 @@ func (s *XianyuService) shouldScanIMNow(now time.Time) bool {
 		return true
 	}
 	return false
+}
+
+func (s *XianyuService) getAutoContextSnapshot(username string, now time.Time) (itemRef, orderStatus string, ok bool) {
+	s.autoCtxMu.Lock()
+	defer s.autoCtxMu.Unlock()
+
+	key := strings.TrimSpace(username)
+	if key == "" {
+		return "", "", false
+	}
+	snap, exists := s.autoCtxByUser[key]
+	if !exists || snap.UpdatedAt.IsZero() || now.Sub(snap.UpdatedAt) > s.autoCtxCacheTTL {
+		return "", "", false
+	}
+	return snap.ItemRef, snap.OrderStatus, true
+}
+
+func (s *XianyuService) shouldRefreshAutoContext(username string, now time.Time) bool {
+	s.autoCtxMu.Lock()
+	defer s.autoCtxMu.Unlock()
+
+	key := strings.TrimSpace(username)
+	if key == "" {
+		return false
+	}
+	snap, exists := s.autoCtxByUser[key]
+	if !exists || snap.LastAttempt.IsZero() || now.Sub(snap.LastAttempt) >= s.autoCtxRefreshInterval {
+		snap.LastAttempt = now
+		s.autoCtxByUser[key] = snap
+		return true
+	}
+	return false
+}
+
+func (s *XianyuService) updateAutoContextSnapshot(username, itemRef, orderStatus string, now time.Time) {
+	key := strings.TrimSpace(username)
+	if key == "" {
+		return
+	}
+	s.autoCtxMu.Lock()
+	defer s.autoCtxMu.Unlock()
+
+	snap := s.autoCtxByUser[key]
+	snap.ItemRef = strings.TrimSpace(itemRef)
+	snap.OrderStatus = normalizeOrderStatus(orderStatus)
+	snap.UpdatedAt = now
+	snap.LastAttempt = now
+	s.autoCtxByUser[key] = snap
 }
 
 func (s *XianyuService) DeleteCookies(ctx context.Context) error {
@@ -562,17 +639,32 @@ func (s *XianyuService) MatchIMKnowledge(ctx context.Context, req *MatchIMKnowle
 	username := strings.TrimSpace(req.Username)
 
 	if req.AutoContext && username != "" && (itemRef == "" || orderStatus == "") {
-		autoCtx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
-		detail, err := s.GetConversationMessages(autoCtx, username, 30)
-		cancel()
-		if err != nil {
-			logrus.Warnf("load conversation for kb auto context failed: %v", err)
-		} else {
+		now := time.Now()
+		if cachedRef, cachedStatus, ok := s.getAutoContextSnapshot(username, now); ok {
 			if itemRef == "" {
-				itemRef = strings.TrimSpace(detail.Conversation.ProductContext.ProductRef)
+				itemRef = cachedRef
 			}
 			if orderStatus == "" {
-				orderStatus = normalizeOrderStatus(detail.Conversation.OrderStatus)
+				orderStatus = cachedStatus
+			}
+		}
+
+		if (itemRef == "" || orderStatus == "") && s.shouldRefreshAutoContext(username, now) {
+			autoCtx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+			detail, err := s.GetConversationMessages(autoCtx, username, 30)
+			cancel()
+			if err != nil {
+				logrus.Warnf("load conversation for kb auto context failed: %v", err)
+			} else {
+				resolvedRef := strings.TrimSpace(detail.Conversation.ProductContext.ProductRef)
+				resolvedStatus := normalizeOrderStatus(detail.Conversation.OrderStatus)
+				s.updateAutoContextSnapshot(username, resolvedRef, resolvedStatus, now)
+				if itemRef == "" {
+					itemRef = resolvedRef
+				}
+				if orderStatus == "" {
+					orderStatus = resolvedStatus
+				}
 			}
 		}
 	}
