@@ -575,6 +575,78 @@ func (s *AppServer) openCustomerServiceHandler(c *gin.Context) {
 	respondSuccess(c, result, "打开客服入口执行完成")
 }
 
+func (s *AppServer) shipWithLogisticsHandler(c *gin.Context) {
+	var req ShipWithLogisticsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if req.Username == "" || req.TrackingNo == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_PARAMS", "缺少参数", "username and tracking_no are required")
+		return
+	}
+
+	result, err := s.xianyuService.ShipWithLogistics(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "SHIP_WITH_LOGISTICS_FAILED", "物流发货失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "物流发货执行完成")
+}
+
+func (s *AppServer) confirmReceiptHandler(c *gin.Context) {
+	var req ConfirmReceiptRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+
+	result, err := s.xianyuService.ConfirmReceipt(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "CONFIRM_RECEIPT_FAILED", "确认收货失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "确认收货执行完成")
+}
+
+func (s *AppServer) reviewOrderHandler(c *gin.Context) {
+	var req ReviewOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+
+	result, err := s.xianyuService.ReviewOrder(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "REVIEW_ORDER_FAILED", "评价订单失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "评价订单执行完成")
+}
+
+func (s *AppServer) refundActionHandler(c *gin.Context) {
+	var req RefundActionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+
+	result, err := s.xianyuService.HandleRefund(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "REFUND_ACTION_FAILED", "退款处理失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "退款处理执行完成")
+}
+
 func healthHandler(c *gin.Context) {
 	respondSuccess(c, map[string]any{
 		"status":    "healthy",

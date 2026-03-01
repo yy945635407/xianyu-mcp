@@ -60,6 +60,10 @@ func setupRoutes(appServer *AppServer) *gin.Engine {
 		api.POST("/community/interact", appServer.interactCommunityHandler)
 		api.GET("/customer/service", appServer.getCustomerServiceHandler)
 		api.POST("/customer/open", appServer.openCustomerServiceHandler)
+		api.POST("/orders/ship_with_logistics", appServer.shipWithLogisticsHandler)
+		api.POST("/orders/confirm_receipt", appServer.confirmReceiptHandler)
+		api.POST("/orders/review", appServer.reviewOrderHandler)
+		api.POST("/orders/refund", appServer.refundActionHandler)
 	}
 
 	return router

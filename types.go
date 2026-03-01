@@ -246,3 +246,28 @@ type CommunityActionResponse struct {
 type CustomerServiceResponse struct {
 	Result xianyu.CustomerServiceResult `json:"result"`
 }
+
+type ShipWithLogisticsRequest struct {
+	Username   string `json:"username" binding:"required"`
+	Company    string `json:"company,omitempty"`
+	TrackingNo string `json:"tracking_no" binding:"required"`
+}
+
+type ConfirmReceiptRequest struct {
+	OrderKeyword string `json:"order_keyword,omitempty"`
+	SellerName   string `json:"seller_name,omitempty"`
+}
+
+type ReviewOrderRequest struct {
+	OrderKeyword string `json:"order_keyword,omitempty"`
+	SellerName   string `json:"seller_name,omitempty"`
+	Score        int    `json:"score,omitempty"` // 1-5
+	Content      string `json:"content,omitempty"`
+}
+
+type RefundActionRequest struct {
+	OrderKeyword string `json:"order_keyword,omitempty"`
+	SellerName   string `json:"seller_name,omitempty"`
+	Action       string `json:"action,omitempty"` // detail|contact|complaint|money|snapshot|delete
+	Reason       string `json:"reason,omitempty"`
+}

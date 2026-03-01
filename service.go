@@ -585,6 +585,78 @@ func (s *XianyuService) OpenCustomerService(ctx context.Context, req *OpenCustom
 	}, nil
 }
 
+func (s *XianyuService) ShipWithLogistics(ctx context.Context, req *ShipWithLogisticsRequest) (*OrderActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewOrderAction(page)
+	result, err := action.ShipWithLogistics(ctx, req.Username, req.Company, req.TrackingNo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OrderActionResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) ConfirmReceipt(ctx context.Context, req *ConfirmReceiptRequest) (*OrderActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewOrderAction(page)
+	result, err := action.ConfirmReceipt(ctx, req.OrderKeyword, req.SellerName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OrderActionResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) ReviewOrder(ctx context.Context, req *ReviewOrderRequest) (*OrderActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewOrderAction(page)
+	result, err := action.ReviewOrder(ctx, req.OrderKeyword, req.SellerName, req.Score, req.Content)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OrderActionResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) HandleRefund(ctx context.Context, req *RefundActionRequest) (*OrderActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewOrderAction(page)
+	result, err := action.HandleRefund(ctx, req.OrderKeyword, req.SellerName, req.Action, req.Reason)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OrderActionResponse{
+		Result: *result,
+	}, nil
+}
+
 func newBrowser() *headless_browser.Browser {
 	return browser.NewBrowser(configs.IsHeadless(), browser.WithBinPath(configs.GetBinPath()))
 }

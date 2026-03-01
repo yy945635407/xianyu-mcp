@@ -141,6 +141,31 @@ type OpenCustomerServiceArgs struct {
 	Name string `json:"name,omitempty" jsonschema:"入口名称：客服|反馈（默认客服）"`
 }
 
+type ShipWithLogisticsArgs struct {
+	Username   string `json:"username" jsonschema:"买家用户名（IM 会话用户名）"`
+	Company    string `json:"company,omitempty" jsonschema:"快递公司（可选）"`
+	TrackingNo string `json:"tracking_no" jsonschema:"物流单号"`
+}
+
+type ConfirmReceiptArgs struct {
+	OrderKeyword string `json:"order_keyword,omitempty" jsonschema:"订单关键字（商品标题片段）"`
+	SellerName   string `json:"seller_name,omitempty" jsonschema:"卖家名称（可选）"`
+}
+
+type ReviewOrderArgs struct {
+	OrderKeyword string `json:"order_keyword,omitempty" jsonschema:"订单关键字（商品标题片段）"`
+	SellerName   string `json:"seller_name,omitempty" jsonschema:"卖家名称（可选）"`
+	Score        int    `json:"score,omitempty" jsonschema:"评分1-5，默认5"`
+	Content      string `json:"content,omitempty" jsonschema:"评价内容（可选）"`
+}
+
+type RefundActionArgs struct {
+	OrderKeyword string `json:"order_keyword,omitempty" jsonschema:"订单关键字（商品标题片段）"`
+	SellerName   string `json:"seller_name,omitempty" jsonschema:"卖家名称（可选）"`
+	Action       string `json:"action,omitempty" jsonschema:"退款动作：detail|contact|complaint|money|snapshot|delete"`
+	Reason       string `json:"reason,omitempty" jsonschema:"补充说明（可选）"`
+}
+
 func InitMCPServer(appServer *AppServer) *mcp.Server {
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -641,7 +666,78 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 27 MCP tools")
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "ship_with_logistics",
+			Description: "卖家发货：从会话进入去发货并尝试填写物流公司/单号（网页受限会返回 requires_app）",
+			Annotations: &mcp.ToolAnnotations{Title: "Ship With Logistics", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("ship_with_logistics", func(ctx context.Context, req *mcp.CallToolRequest, args ShipWithLogisticsArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Username) == "" || strings.TrimSpace(args.TrackingNo) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 username 或 tracking_no 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleShipWithLogistics(ctx, ShipWithLogisticsRequest{
+				Username:   args.Username,
+				Company:    args.Company,
+				TrackingNo: args.TrackingNo,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "confirm_receipt",
+			Description: "买家确认收货",
+			Annotations: &mcp.ToolAnnotations{Title: "Confirm Receipt", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("confirm_receipt", func(ctx context.Context, req *mcp.CallToolRequest, args ConfirmReceiptArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleConfirmReceipt(ctx, ConfirmReceiptRequest{
+				OrderKeyword: args.OrderKeyword,
+				SellerName:   args.SellerName,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "review_order",
+			Description: "订单评价（支持评分和评价内容）",
+			Annotations: &mcp.ToolAnnotations{Title: "Review Order", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("review_order", func(ctx context.Context, req *mcp.CallToolRequest, args ReviewOrderArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleReviewOrder(ctx, ReviewOrderRequest{
+				OrderKeyword: args.OrderKeyword,
+				SellerName:   args.SellerName,
+				Score:        args.Score,
+				Content:      args.Content,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "handle_refund",
+			Description: "退款中订单处理（退款详情/联系卖家/投诉卖家/查看钱款等）",
+			Annotations: &mcp.ToolAnnotations{Title: "Handle Refund", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("handle_refund", func(ctx context.Context, req *mcp.CallToolRequest, args RefundActionArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleRefundAction(ctx, RefundActionRequest{
+				OrderKeyword: args.OrderKeyword,
+				SellerName:   args.SellerName,
+				Action:       args.Action,
+				Reason:       args.Reason,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Info("Registered 31 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {
