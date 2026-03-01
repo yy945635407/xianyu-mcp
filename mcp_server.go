@@ -33,6 +33,28 @@ type PullIMEventsArgs struct {
 	ScanLimit int   `json:"scan_limit,omitempty" jsonschema:"扫描会话条数限制，默认30"`
 }
 
+type GetIMSessionStateArgs struct {
+	Username string `json:"username" jsonschema:"会话用户名"`
+}
+
+type ListIMSessionStatesArgs struct {
+	Limit int `json:"limit,omitempty" jsonschema:"返回会话状态条数限制，默认200"`
+}
+
+type SetIMSessionStateArgs struct {
+	Username      string `json:"username" jsonschema:"会话用户名"`
+	Mode          string `json:"mode,omitempty" jsonschema:"会话模式：bot|human"`
+	HandoffReason string `json:"handoff_reason,omitempty" jsonschema:"人工接管原因（可选）"`
+	LockOwner     string `json:"lock_owner,omitempty" jsonschema:"锁持有者（可选）"`
+	LockSeconds   int64  `json:"lock_seconds,omitempty" jsonschema:"锁定秒数（可选）"`
+	ClearLock     bool   `json:"clear_lock,omitempty" jsonschema:"是否清除会话锁"`
+}
+
+type MarkIMSessionReadArgs struct {
+	Username string `json:"username" jsonschema:"会话用户名"`
+	Limit    int    `json:"limit,omitempty" jsonschema:"读取消息条数限制，默认30"`
+}
+
 type SendMessageArgs struct {
 	Username string `json:"username" jsonschema:"会话用户名"`
 	Message  string `json:"message" jsonschema:"要发送的消息内容"`
@@ -304,6 +326,82 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 				SinceID:   args.SinceID,
 				Limit:     args.Limit,
 				ScanLimit: args.ScanLimit,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_im_session_state",
+			Description: "读取单个会话的机器人/人工状态与锁信息",
+			Annotations: &mcp.ToolAnnotations{Title: "Get IM Session State", ReadOnlyHint: true},
+		},
+		withPanicRecovery("get_im_session_state", func(ctx context.Context, req *mcp.CallToolRequest, args GetIMSessionStateArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Username) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 username 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleGetIMSessionState(ctx, args.Username)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "list_im_session_states",
+			Description: "读取会话状态列表（机器人/人工/锁状态）",
+			Annotations: &mcp.ToolAnnotations{Title: "List IM Session States", ReadOnlyHint: true},
+		},
+		withPanicRecovery("list_im_session_states", func(ctx context.Context, req *mcp.CallToolRequest, args ListIMSessionStatesArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleListIMSessionStates(ctx, args.Limit)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "set_im_session_state",
+			Description: "设置会话状态（bot/human）、人工接管原因与会话锁",
+			Annotations: &mcp.ToolAnnotations{Title: "Set IM Session State", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("set_im_session_state", func(ctx context.Context, req *mcp.CallToolRequest, args SetIMSessionStateArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Username) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 username 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleSetIMSessionState(ctx, SetIMSessionStateRequest{
+				Username:      args.Username,
+				Mode:          args.Mode,
+				HandoffReason: args.HandoffReason,
+				LockOwner:     args.LockOwner,
+				LockSeconds:   args.LockSeconds,
+				ClearLock:     args.ClearLock,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "mark_im_session_read",
+			Description: "打开指定会话并标记为已读",
+			Annotations: &mcp.ToolAnnotations{Title: "Mark IM Session Read", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("mark_im_session_read", func(ctx context.Context, req *mcp.CallToolRequest, args MarkIMSessionReadArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Username) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 username 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleMarkIMSessionRead(ctx, MarkIMSessionReadRequest{
+				Username: args.Username,
+				Limit:    args.Limit,
 			})
 			return convertToMCPResult(result), nil, nil
 		}),
@@ -759,7 +857,7 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 32 MCP tools")
+	logrus.Info("Registered 36 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {

@@ -102,6 +102,29 @@ type PullIMEventsResponse struct {
 	Events     []IMEvent `json:"events"`
 }
 
+type SetIMSessionStateRequest struct {
+	Username      string `json:"username" binding:"required"`
+	Mode          string `json:"mode,omitempty"` // bot|human
+	HandoffReason string `json:"handoff_reason,omitempty"`
+	LockOwner     string `json:"lock_owner,omitempty"`
+	LockSeconds   int64  `json:"lock_seconds,omitempty"`
+	ClearLock     bool   `json:"clear_lock,omitempty"`
+}
+
+type MarkIMSessionReadRequest struct {
+	Username string `json:"username" binding:"required"`
+	Limit    int    `json:"limit,omitempty"`
+}
+
+type IMSessionStateResponse struct {
+	State IMSessionState `json:"state"`
+}
+
+type IMSessionStatesResponse struct {
+	Count  int              `json:"count"`
+	States []IMSessionState `json:"states"`
+}
+
 type PublishItemRequest struct {
 	Images            []string `json:"images" binding:"required,min=1"`
 	Description       string   `json:"description" binding:"required"`

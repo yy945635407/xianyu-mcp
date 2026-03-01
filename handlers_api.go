@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -204,6 +205,86 @@ func (s *AppServer) pullIMEventsHandler(c *gin.Context) {
 
 	c.Set("account", "xianyu-mcp")
 	respondSuccess(c, result, "拉取增量消息成功")
+}
+
+func (s *AppServer) getIMSessionStateHandler(c *gin.Context) {
+	username := c.Query("username")
+	if strings.TrimSpace(username) == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_USERNAME", "缺少用户名参数", "username is required")
+		return
+	}
+
+	result, err := s.xianyuService.GetIMSessionState(c.Request.Context(), username)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "GET_IM_SESSION_STATE_FAILED", "查询会话状态失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "查询会话状态成功")
+}
+
+func (s *AppServer) listIMSessionStatesHandler(c *gin.Context) {
+	limit := 200
+	if limitStr := c.Query("limit"); limitStr != "" {
+		parsed, err := strconv.Atoi(limitStr)
+		if err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "limit 必须是整数", err.Error())
+			return
+		}
+		limit = parsed
+	}
+
+	result, err := s.xianyuService.ListIMSessionStates(c.Request.Context(), limit)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "LIST_IM_SESSION_STATES_FAILED", "读取会话状态列表失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "读取会话状态列表成功")
+}
+
+func (s *AppServer) setIMSessionStateHandler(c *gin.Context) {
+	var req SetIMSessionStateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if strings.TrimSpace(req.Username) == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_USERNAME", "缺少用户名参数", "username is required")
+		return
+	}
+
+	result, err := s.xianyuService.SetIMSessionState(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "SET_IM_SESSION_STATE_FAILED", "设置会话状态失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "设置会话状态成功")
+}
+
+func (s *AppServer) markIMSessionReadHandler(c *gin.Context) {
+	var req MarkIMSessionReadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if strings.TrimSpace(req.Username) == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_USERNAME", "缺少用户名参数", "username is required")
+		return
+	}
+
+	result, err := s.xianyuService.MarkIMSessionRead(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "MARK_IM_SESSION_READ_FAILED", "会话标记已读失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "会话标记已读成功")
 }
 
 func (s *AppServer) sendMessageHandler(c *gin.Context) {

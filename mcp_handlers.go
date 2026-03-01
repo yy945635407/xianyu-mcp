@@ -156,6 +156,82 @@ func (s *AppServer) handlePullIMEvents(ctx context.Context, req PullIMEventsRequ
 	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
 }
 
+func (s *AppServer) handleGetIMSessionState(ctx context.Context, username string) *MCPToolResult {
+	result, err := s.xianyuService.GetIMSessionState(ctx, username)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "查询会话状态失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "查询成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleListIMSessionStates(ctx context.Context, limit int) *MCPToolResult {
+	result, err := s.xianyuService.ListIMSessionStates(ctx, limit)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "读取会话状态列表失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "读取成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleSetIMSessionState(ctx context.Context, req SetIMSessionStateRequest) *MCPToolResult {
+	result, err := s.xianyuService.SetIMSessionState(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "设置会话状态失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "设置成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleMarkIMSessionRead(ctx context.Context, req MarkIMSessionReadRequest) *MCPToolResult {
+	result, err := s.xianyuService.MarkIMSessionRead(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "会话标记已读失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "标记成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
 func (s *AppServer) handleSendMessage(ctx context.Context, username, message string, limit int) *MCPToolResult {
 	result, err := s.xianyuService.SendMessage(ctx, username, message, limit)
 	if err != nil {

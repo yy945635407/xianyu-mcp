@@ -229,6 +229,67 @@ func (s *XianyuService) PullIMEvents(ctx context.Context, req *PullIMEventsReque
 	}, nil
 }
 
+func (s *XianyuService) GetIMSessionState(ctx context.Context, username string) (*IMSessionStateResponse, error) {
+	store, err := getIMSessionStore()
+	if err != nil {
+		return nil, err
+	}
+	state := store.Get(username)
+	return &IMSessionStateResponse{State: state}, nil
+}
+
+func (s *XianyuService) ListIMSessionStates(ctx context.Context, limit int) (*IMSessionStatesResponse, error) {
+	store, err := getIMSessionStore()
+	if err != nil {
+		return nil, err
+	}
+	states := store.List(limit)
+	return &IMSessionStatesResponse{
+		Count:  len(states),
+		States: states,
+	}, nil
+}
+
+func (s *XianyuService) SetIMSessionState(ctx context.Context, req *SetIMSessionStateRequest) (*IMSessionStateResponse, error) {
+	store, err := getIMSessionStore()
+	if err != nil {
+		return nil, err
+	}
+	state, err := store.Upsert(req.Username, req.Mode, req.HandoffReason, req.LockOwner, req.LockSeconds, req.ClearLock)
+	if err != nil {
+		return nil, err
+	}
+	return &IMSessionStateResponse{State: state}, nil
+}
+
+func (s *XianyuService) MarkIMSessionRead(ctx context.Context, req *MarkIMSessionReadRequest) (*IMSessionStateResponse, error) {
+	limit := req.Limit
+	if limit <= 0 || limit > 500 {
+		limit = 30
+	}
+
+	b := newBrowser()
+	defer b.Close()
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewMessageAction(page)
+	_, err := action.GetConversationByUsername(ctx, req.Username, limit)
+	if err != nil {
+		logrus.Warnf("mark read by opening conversation failed (fallback to local state): %v", err)
+	}
+
+	store, err := getIMSessionStore()
+	if err != nil {
+		return nil, err
+	}
+	state, err := store.MarkRead(req.Username, time.Now().UnixMilli())
+	if err != nil {
+		return nil, err
+	}
+	return &IMSessionStateResponse{State: state}, nil
+}
+
 func (s *XianyuService) PublishItem(ctx context.Context, req *PublishItemRequest) (*PublishItemResponse, error) {
 	b := newBrowser()
 	defer b.Close()
