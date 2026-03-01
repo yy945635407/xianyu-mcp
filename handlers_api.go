@@ -181,6 +181,23 @@ func (s *AppServer) sendMessageHandler(c *gin.Context) {
 	respondSuccess(c, result, "发送消息成功")
 }
 
+func (s *AppServer) publishItemHandler(c *gin.Context) {
+	var req PublishItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+
+	result, err := s.xianyuService.PublishItem(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "PUBLISH_ITEM_FAILED", "发布闲置失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "发布闲置流程执行成功")
+}
+
 func healthHandler(c *gin.Context) {
 	respondSuccess(c, map[string]any{
 		"status":    "healthy",

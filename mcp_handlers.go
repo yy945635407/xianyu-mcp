@@ -156,6 +156,25 @@ func (s *AppServer) handleSendMessage(ctx context.Context, username, message str
 	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
 }
 
+func (s *AppServer) handlePublishItem(ctx context.Context, req PublishItemRequest) *MCPToolResult {
+	result, err := s.xianyuService.PublishItem(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "发布闲置失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "发布流程执行成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
 func normalizeQRCodeData(img string) string {
 	trimmed := strings.TrimSpace(img)
 	trimmed = strings.TrimPrefix(trimmed, "data:image/png;base64,")

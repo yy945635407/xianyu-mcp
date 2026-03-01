@@ -11,6 +11,7 @@
 - `list_conversations`：读取消息会话列表（用户名、最新消息、状态）
 - `get_messages`：按用户名查询消息（含商品上下文与订单状态）
 - `send_message`：按用户名发送消息
+- `publish_item`：按网页字段发布闲置（支持 `submit=false` 仅填表校验）
 - HTTP API 与 MCP Streamable HTTP 双入口
 
 ## 快速开始
@@ -46,6 +47,25 @@ curl 'http://localhost:18061/api/v1/im/messages?username=发韧的树枝&limit=3
 curl -X POST 'http://localhost:18061/api/v1/im/send' \
   -H 'Content-Type: application/json' \
   -d '{"username":"发韧的树枝","message":"你好","limit":20}'
+```
+
+发布接口示例（不真正提交）：
+
+```bash
+curl -X POST 'http://localhost:18061/api/v1/publish/item' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "images": ["/abs/path/a.jpg"],
+    "description": "九成新，正常使用",
+    "price": "88",
+    "original_price": "120",
+    "shipping_type": "包邮",
+    "shipping_fee": "",
+    "support_self_pickup": false,
+    "location_keyword": "成都",
+    "spec_types": [],
+    "submit": false
+  }'
 ```
 
 ## 浏览器探索调试

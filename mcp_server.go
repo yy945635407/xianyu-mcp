@@ -32,6 +32,19 @@ type SendMessageArgs struct {
 	Limit    int    `json:"limit,omitempty" jsonschema:"发送后返回最近消息条数限制，默认30"`
 }
 
+type PublishItemArgs struct {
+	Images            []string `json:"images" jsonschema:"本地图片绝对路径列表（至少1张）"`
+	Description       string   `json:"description" jsonschema:"宝贝描述（网页必填）"`
+	Price             string   `json:"price" jsonschema:"售价（网页必填）"`
+	OriginalPrice     string   `json:"original_price,omitempty" jsonschema:"原价（可选）"`
+	ShippingType      string   `json:"shipping_type,omitempty" jsonschema:"发货方式：包邮|按距离计费|一口价|无需邮寄"`
+	ShippingFee       string   `json:"shipping_fee,omitempty" jsonschema:"邮费（按距离计费/一口价时建议填写）"`
+	SupportSelfPickup bool     `json:"support_self_pickup,omitempty" jsonschema:"是否支持自提"`
+	LocationKeyword   string   `json:"location_keyword,omitempty" jsonschema:"地址关键字，匹配“宝贝所在地”候选地址"`
+	SpecTypes         []string `json:"spec_types,omitempty" jsonschema:"商品规格类型列表（可选，最多2个）"`
+	Submit            bool     `json:"submit,omitempty" jsonschema:"是否实际点击发布。false仅填表校验，true执行发布"`
+}
+
 func InitMCPServer(appServer *AppServer) *mcp.Server {
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -171,7 +184,37 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 7 MCP tools")
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "publish_item",
+			Description: "发布闲置商品，参数覆盖网页可填写字段。默认建议 submit=false 先做填表校验。",
+			Annotations: &mcp.ToolAnnotations{Title: "Publish Item", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("publish_item", func(ctx context.Context, req *mcp.CallToolRequest, args PublishItemArgs) (*mcp.CallToolResult, any, error) {
+			if len(args.Images) == 0 || args.Description == "" || args.Price == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少必填参数：images/description/price"}},
+				}, nil, nil
+			}
+
+			result := appServer.handlePublishItem(ctx, PublishItemRequest{
+				Images:            args.Images,
+				Description:       args.Description,
+				Price:             args.Price,
+				OriginalPrice:     args.OriginalPrice,
+				ShippingType:      args.ShippingType,
+				ShippingFee:       args.ShippingFee,
+				SupportSelfPickup: args.SupportSelfPickup,
+				LocationKeyword:   args.LocationKeyword,
+				SpecTypes:         args.SpecTypes,
+				Submit:            args.Submit,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Info("Registered 8 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {

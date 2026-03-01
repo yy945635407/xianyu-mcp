@@ -194,6 +194,35 @@ func (s *XianyuService) SendMessage(ctx context.Context, username, message strin
 	}, nil
 }
 
+func (s *XianyuService) PublishItem(ctx context.Context, req *PublishItemRequest) (*PublishItemResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewPublishItemAction(page)
+	result, err := action.Publish(ctx, xianyu.PublishItemContent{
+		Images:            req.Images,
+		Description:       req.Description,
+		Price:             req.Price,
+		OriginalPrice:     req.OriginalPrice,
+		ShippingType:      req.ShippingType,
+		ShippingFee:       req.ShippingFee,
+		SupportSelfPickup: req.SupportSelfPickup,
+		LocationKeyword:   req.LocationKeyword,
+		SpecTypes:         req.SpecTypes,
+		Submit:            req.Submit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &PublishItemResponse{
+		Result: *result,
+	}, nil
+}
+
 func newBrowser() *headless_browser.Browser {
 	return browser.NewBrowser(configs.IsHeadless(), browser.WithBinPath(configs.GetBinPath()))
 }

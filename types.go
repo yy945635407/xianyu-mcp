@@ -87,3 +87,20 @@ type SendMessageResponse struct {
 	Sent         bool                      `json:"sent"`
 	Conversation xianyu.ConversationDetail `json:"conversation"`
 }
+
+type PublishItemRequest struct {
+	Images            []string `json:"images" binding:"required,min=1"`
+	Description       string   `json:"description" binding:"required"`
+	Price             string   `json:"price" binding:"required"`
+	OriginalPrice     string   `json:"original_price,omitempty"`
+	ShippingType      string   `json:"shipping_type,omitempty"` // 包邮|按距离计费|一口价|无需邮寄
+	ShippingFee       string   `json:"shipping_fee,omitempty"`
+	SupportSelfPickup bool     `json:"support_self_pickup,omitempty"`
+	LocationKeyword   string   `json:"location_keyword,omitempty"`
+	SpecTypes         []string `json:"spec_types,omitempty"`
+	Submit            bool     `json:"submit,omitempty"`
+}
+
+type PublishItemResponse struct {
+	Result xianyu.PublishItemResult `json:"result"`
+}
