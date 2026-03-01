@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"runtime/debug"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sirupsen/logrus"
@@ -43,6 +44,20 @@ type PublishItemArgs struct {
 	LocationKeyword   string   `json:"location_keyword,omitempty" jsonschema:"地址关键字，匹配“宝贝所在地”候选地址"`
 	SpecTypes         []string `json:"spec_types,omitempty" jsonschema:"商品规格类型列表（可选，最多2个）"`
 	Submit            bool     `json:"submit,omitempty" jsonschema:"是否实际点击发布。false仅填表校验，true执行发布"`
+}
+
+type ListOrdersArgs struct {
+	Tab   string `json:"tab,omitempty" jsonschema:"订单页签：全部|待付款|待发货|待收货|待评价|退款中"`
+	Limit int    `json:"limit,omitempty" jsonschema:"返回条数限制，默认20"`
+}
+
+type RemindShipArgs struct {
+	OrderKeyword string `json:"order_keyword,omitempty" jsonschema:"订单关键字（商品标题片段）"`
+	SellerName   string `json:"seller_name,omitempty" jsonschema:"卖家名称（可选）"`
+}
+
+type ShipOrderArgs struct {
+	Username string `json:"username" jsonschema:"买家用户名（IM 会话用户名）"`
 }
 
 func InitMCPServer(appServer *AppServer) *mcp.Server {
@@ -214,7 +229,54 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 8 MCP tools")
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "list_orders",
+			Description: "查询买到订单列表，可按页签筛选",
+			Annotations: &mcp.ToolAnnotations{Title: "List Orders", ReadOnlyHint: true},
+		},
+		withPanicRecovery("list_orders", func(ctx context.Context, req *mcp.CallToolRequest, args ListOrdersArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleListOrders(ctx, args.Tab, args.Limit)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "remind_ship",
+			Description: "在买到订单中触发“提醒发货”",
+			Annotations: &mcp.ToolAnnotations{Title: "Remind Ship", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("remind_ship", func(ctx context.Context, req *mcp.CallToolRequest, args RemindShipArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleRemindShip(ctx, RemindShipRequest{
+				OrderKeyword: args.OrderKeyword,
+				SellerName:   args.SellerName,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "ship_order",
+			Description: "在 IM 会话里触发“去发货”，若网页端受限会返回 requires_app=true",
+			Annotations: &mcp.ToolAnnotations{Title: "Ship Order", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("ship_order", func(ctx context.Context, req *mcp.CallToolRequest, args ShipOrderArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Username) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 username 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleShipOrder(ctx, ShipOrderRequest{
+				Username: args.Username,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Info("Registered 11 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {

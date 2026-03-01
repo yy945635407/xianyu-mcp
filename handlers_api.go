@@ -198,6 +198,66 @@ func (s *AppServer) publishItemHandler(c *gin.Context) {
 	respondSuccess(c, result, "发布闲置流程执行成功")
 }
 
+func (s *AppServer) listOrdersHandler(c *gin.Context) {
+	tab := c.Query("tab")
+	limit := 20
+	if limitStr := c.Query("limit"); limitStr != "" {
+		parsed, err := strconv.Atoi(limitStr)
+		if err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "limit 必须是整数", err.Error())
+			return
+		}
+		limit = parsed
+	}
+
+	result, err := s.xianyuService.ListOrders(c.Request.Context(), tab, limit)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "LIST_ORDERS_FAILED", "查询订单失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "查询订单成功")
+}
+
+func (s *AppServer) remindShipHandler(c *gin.Context) {
+	var req RemindShipRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+
+	result, err := s.xianyuService.RemindShip(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "REMIND_SHIP_FAILED", "提醒发货失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "提醒发货执行完成")
+}
+
+func (s *AppServer) shipOrderHandler(c *gin.Context) {
+	var req ShipOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if req.Username == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_USERNAME", "缺少用户名参数", "username is required")
+		return
+	}
+
+	result, err := s.xianyuService.ShipOrder(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "SHIP_ORDER_FAILED", "发货操作失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "发货操作执行完成")
+}
+
 func healthHandler(c *gin.Context) {
 	respondSuccess(c, map[string]any{
 		"status":    "healthy",

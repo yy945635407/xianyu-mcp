@@ -41,6 +41,9 @@ func setupRoutes(appServer *AppServer) *gin.Engine {
 		api.POST("/im/messages", appServer.getMessagesHandler)
 		api.POST("/im/send", appServer.sendMessageHandler)
 		api.POST("/publish/item", appServer.publishItemHandler)
+		api.GET("/orders/list", appServer.listOrdersHandler)
+		api.POST("/orders/remind_ship", appServer.remindShipHandler)
+		api.POST("/orders/ship", appServer.shipOrderHandler)
 	}
 
 	return router

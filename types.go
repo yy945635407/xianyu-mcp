@@ -104,3 +104,26 @@ type PublishItemRequest struct {
 type PublishItemResponse struct {
 	Result xianyu.PublishItemResult `json:"result"`
 }
+
+type ListOrdersRequest struct {
+	Tab   string `json:"tab,omitempty"` // 全部|待付款|待发货|待收货|待评价|退款中
+	Limit int    `json:"limit,omitempty"`
+}
+
+type ListOrdersResponse struct {
+	Count  int                   `json:"count"`
+	Orders []xianyu.OrderSummary `json:"orders"`
+}
+
+type RemindShipRequest struct {
+	OrderKeyword string `json:"order_keyword,omitempty"`
+	SellerName   string `json:"seller_name,omitempty"`
+}
+
+type ShipOrderRequest struct {
+	Username string `json:"username" binding:"required"`
+}
+
+type OrderActionResponse struct {
+	Result xianyu.OrderActionResult `json:"result"`
+}

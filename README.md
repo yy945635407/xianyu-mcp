@@ -12,6 +12,9 @@
 - `get_messages`：按用户名查询消息（含商品上下文与订单状态）
 - `send_message`：按用户名发送消息
 - `publish_item`：按网页字段发布闲置（支持 `submit=false` 仅填表校验）
+- `list_orders`：读取订单列表（可按页签筛选）
+- `remind_ship`：提醒卖家发货（买家订单场景）
+- `ship_order`：触发去发货（若网页端受限会返回需 APP）
 - HTTP API 与 MCP Streamable HTTP 双入口
 
 ## 快速开始
@@ -66,6 +69,23 @@ curl -X POST 'http://localhost:18061/api/v1/publish/item' \
     "spec_types": [],
     "submit": false
   }'
+```
+
+订单接口示例：
+
+```bash
+# 列订单
+curl 'http://localhost:18061/api/v1/orders/list?tab=全部&limit=20'
+
+# 提醒发货
+curl -X POST 'http://localhost:18061/api/v1/orders/remind_ship' \
+  -H 'Content-Type: application/json' \
+  -d '{"order_keyword":"车展门票","seller_name":"后晋登山的大挣"}'
+
+# 去发货（卖家会话）
+curl -X POST 'http://localhost:18061/api/v1/orders/ship' \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"发韧的树枝"}'
 ```
 
 ## 浏览器探索调试

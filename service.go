@@ -223,6 +223,65 @@ func (s *XianyuService) PublishItem(ctx context.Context, req *PublishItemRequest
 	}, nil
 }
 
+func (s *XianyuService) ListOrders(ctx context.Context, tab string, limit int) (*ListOrdersResponse, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 20
+	}
+
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewOrderAction(page)
+	orders, err := action.ListOrders(ctx, tab, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ListOrdersResponse{
+		Count:  len(orders),
+		Orders: orders,
+	}, nil
+}
+
+func (s *XianyuService) RemindShip(ctx context.Context, req *RemindShipRequest) (*OrderActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewOrderAction(page)
+	result, err := action.RemindShip(ctx, req.OrderKeyword, req.SellerName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OrderActionResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) ShipOrder(ctx context.Context, req *ShipOrderRequest) (*OrderActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewOrderAction(page)
+	result, err := action.ShipOrder(ctx, req.Username)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OrderActionResponse{
+		Result: *result,
+	}, nil
+}
+
 func newBrowser() *headless_browser.Browser {
 	return browser.NewBrowser(configs.IsHeadless(), browser.WithBinPath(configs.GetBinPath()))
 }
