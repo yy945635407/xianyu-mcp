@@ -60,6 +60,23 @@ type ShipOrderArgs struct {
 	Username string `json:"username" jsonschema:"买家用户名（IM 会话用户名）"`
 }
 
+type ListCollectionsArgs struct {
+	Group string `json:"group,omitempty" jsonschema:"收藏分组名称（默认全部）"`
+	Limit int    `json:"limit,omitempty" jsonschema:"返回条数限制，默认20"`
+}
+
+type CancelFavoriteArgs struct {
+	Keyword string `json:"keyword,omitempty" jsonschema:"商品标题关键字（和 item_ref 至少一个）"`
+	ItemRef string `json:"item_ref,omitempty" jsonschema:"商品链接或商品ID（和 keyword 至少一个）"`
+}
+
+type ManageCollectionGroupArgs struct {
+	Operation   string `json:"operation" jsonschema:"分组操作：create|rename|delete|move"`
+	GroupName   string `json:"group_name,omitempty" jsonschema:"分组名称（rename/delete/move 需要）"`
+	NewName     string `json:"new_name,omitempty" jsonschema:"新分组名（create/rename 可用）"`
+	ItemKeyword string `json:"item_keyword,omitempty" jsonschema:"商品关键字（move 需要）"`
+}
+
 func InitMCPServer(appServer *AppServer) *mcp.Server {
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -276,7 +293,63 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 11 MCP tools")
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "list_collections",
+			Description: "读取收藏夹商品列表与分组信息",
+			Annotations: &mcp.ToolAnnotations{Title: "List Collections", ReadOnlyHint: true},
+		},
+		withPanicRecovery("list_collections", func(ctx context.Context, req *mcp.CallToolRequest, args ListCollectionsArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleListCollections(ctx, args.Group, args.Limit)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "cancel_favorite",
+			Description: "取消收藏商品（通过关键词或商品链接/ID匹配）",
+			Annotations: &mcp.ToolAnnotations{Title: "Cancel Favorite", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("cancel_favorite", func(ctx context.Context, req *mcp.CallToolRequest, args CancelFavoriteArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Keyword) == "" && strings.TrimSpace(args.ItemRef) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 keyword 或 item_ref 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleCancelFavorite(ctx, CancelFavoriteRequest{
+				Keyword: args.Keyword,
+				ItemRef: args.ItemRef,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "manage_collection_group",
+			Description: "管理收藏分组：create|rename|delete|move",
+			Annotations: &mcp.ToolAnnotations{Title: "Manage Collection Group", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("manage_collection_group", func(ctx context.Context, req *mcp.CallToolRequest, args ManageCollectionGroupArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Operation) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 operation 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleManageCollectionGroup(ctx, ManageCollectionGroupRequest{
+				Operation:   args.Operation,
+				GroupName:   args.GroupName,
+				NewName:     args.NewName,
+				ItemKeyword: args.ItemKeyword,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Info("Registered 14 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {

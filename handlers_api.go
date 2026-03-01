@@ -258,6 +258,66 @@ func (s *AppServer) shipOrderHandler(c *gin.Context) {
 	respondSuccess(c, result, "发货操作执行完成")
 }
 
+func (s *AppServer) listCollectionsHandler(c *gin.Context) {
+	group := c.Query("group")
+	limit := 20
+	if limitStr := c.Query("limit"); limitStr != "" {
+		parsed, err := strconv.Atoi(limitStr)
+		if err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "limit 必须是整数", err.Error())
+			return
+		}
+		limit = parsed
+	}
+
+	result, err := s.xianyuService.ListCollections(c.Request.Context(), group, limit)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "LIST_COLLECTIONS_FAILED", "读取收藏夹失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "读取收藏夹成功")
+}
+
+func (s *AppServer) cancelFavoriteHandler(c *gin.Context) {
+	var req CancelFavoriteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if req.Keyword == "" && req.ItemRef == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_PARAMS", "缺少参数", "keyword or item_ref is required")
+		return
+	}
+
+	result, err := s.xianyuService.CancelFavorite(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "CANCEL_FAVORITE_FAILED", "取消收藏失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "取消收藏执行完成")
+}
+
+func (s *AppServer) manageCollectionGroupHandler(c *gin.Context) {
+	var req ManageCollectionGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+
+	result, err := s.xianyuService.ManageCollectionGroup(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "MANAGE_COLLECTION_GROUP_FAILED", "分组管理失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "分组管理执行完成")
+}
+
 func healthHandler(c *gin.Context) {
 	respondSuccess(c, map[string]any{
 		"status":    "healthy",

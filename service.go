@@ -282,6 +282,64 @@ func (s *XianyuService) ShipOrder(ctx context.Context, req *ShipOrderRequest) (*
 	}, nil
 }
 
+func (s *XianyuService) ListCollections(ctx context.Context, group string, limit int) (*ListCollectionsResponse, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 20
+	}
+
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewCollectionAction(page)
+	result, err := action.ListCollections(ctx, group, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ListCollectionsResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) CancelFavorite(ctx context.Context, req *CancelFavoriteRequest) (*CollectionActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewCollectionAction(page)
+	result, err := action.CancelFavorite(ctx, req.Keyword, req.ItemRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CollectionActionResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) ManageCollectionGroup(ctx context.Context, req *ManageCollectionGroupRequest) (*CollectionActionResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewCollectionAction(page)
+	result, err := action.ManageGroup(ctx, req.Operation, req.GroupName, req.NewName, req.ItemKeyword)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CollectionActionResponse{
+		Result: *result,
+	}, nil
+}
+
 func newBrowser() *headless_browser.Browser {
 	return browser.NewBrowser(configs.IsHeadless(), browser.WithBinPath(configs.GetBinPath()))
 }

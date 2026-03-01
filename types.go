@@ -127,3 +127,28 @@ type ShipOrderRequest struct {
 type OrderActionResponse struct {
 	Result xianyu.OrderActionResult `json:"result"`
 }
+
+type ListCollectionsRequest struct {
+	Group string `json:"group,omitempty"`
+	Limit int    `json:"limit,omitempty"`
+}
+
+type CancelFavoriteRequest struct {
+	Keyword string `json:"keyword,omitempty"`
+	ItemRef string `json:"item_ref,omitempty"`
+}
+
+type ManageCollectionGroupRequest struct {
+	Operation   string `json:"operation" binding:"required"` // create|rename|delete|move
+	GroupName   string `json:"group_name,omitempty"`
+	NewName     string `json:"new_name,omitempty"`
+	ItemKeyword string `json:"item_keyword,omitempty"`
+}
+
+type ListCollectionsResponse struct {
+	Result xianyu.CollectionListResult `json:"result"`
+}
+
+type CollectionActionResponse struct {
+	Result xianyu.CollectionActionResult `json:"result"`
+}

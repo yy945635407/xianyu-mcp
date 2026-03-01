@@ -232,6 +232,63 @@ func (s *AppServer) handleShipOrder(ctx context.Context, req ShipOrderRequest) *
 	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
 }
 
+func (s *AppServer) handleListCollections(ctx context.Context, group string, limit int) *MCPToolResult {
+	result, err := s.xianyuService.ListCollections(ctx, group, limit)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "读取收藏夹失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "读取成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleCancelFavorite(ctx context.Context, req CancelFavoriteRequest) *MCPToolResult {
+	result, err := s.xianyuService.CancelFavorite(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "取消收藏失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "取消收藏执行完成但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleManageCollectionGroup(ctx context.Context, req ManageCollectionGroupRequest) *MCPToolResult {
+	result, err := s.xianyuService.ManageCollectionGroup(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "分组管理失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "分组管理执行完成但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
 func normalizeQRCodeData(img string) string {
 	trimmed := strings.TrimSpace(img)
 	trimmed = strings.TrimPrefix(trimmed, "data:image/png;base64,")
