@@ -39,7 +39,7 @@ type autoContextSnapshot struct {
 }
 
 func NewXianyuService() *XianyuService {
-	minInterval := 8 * time.Second
+	minInterval := 15 * time.Second
 	if raw := strings.TrimSpace(os.Getenv("XIANYU_IM_SCAN_INTERVAL_MS")); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil && v >= 1000 {
 			minInterval = time.Duration(v) * time.Millisecond
