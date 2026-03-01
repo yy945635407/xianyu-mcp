@@ -36,6 +36,10 @@ func setupRoutes(appServer *AppServer) *gin.Engine {
 		api.DELETE("/login/cookies", appServer.deleteCookiesHandler)
 		api.GET("/search", appServer.searchItemsHandler)
 		api.POST("/search", appServer.searchItemsHandler)
+		api.GET("/im/conversations", appServer.listConversationsHandler)
+		api.GET("/im/messages", appServer.getMessagesHandler)
+		api.POST("/im/messages", appServer.getMessagesHandler)
+		api.POST("/im/send", appServer.sendMessageHandler)
 	}
 
 	return router

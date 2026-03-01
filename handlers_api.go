@@ -103,6 +103,84 @@ func (s *AppServer) searchItemsHandler(c *gin.Context) {
 	respondSuccess(c, result, "搜索商品成功")
 }
 
+func (s *AppServer) listConversationsHandler(c *gin.Context) {
+	limit := 20
+	if limitStr := c.Query("limit"); limitStr != "" {
+		parsed, err := strconv.Atoi(limitStr)
+		if err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "limit 必须是整数", err.Error())
+			return
+		}
+		limit = parsed
+	}
+
+	result, err := s.xianyuService.ListConversations(c.Request.Context(), limit)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "LIST_CONVERSATIONS_FAILED", "读取消息列表失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "读取消息列表成功")
+}
+
+func (s *AppServer) getMessagesHandler(c *gin.Context) {
+	var req GetMessagesRequest
+
+	switch c.Request.Method {
+	case http.MethodPost:
+		if err := c.ShouldBindJSON(&req); err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+			return
+		}
+	default:
+		req.Username = c.Query("username")
+		if limitStr := c.Query("limit"); limitStr != "" {
+			limit, err := strconv.Atoi(limitStr)
+			if err != nil {
+				respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "limit 必须是整数", err.Error())
+				return
+			}
+			req.Limit = limit
+		}
+	}
+
+	if req.Username == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_USERNAME", "缺少用户名参数", "username is required")
+		return
+	}
+
+	result, err := s.xianyuService.GetConversationMessages(c.Request.Context(), req.Username, req.Limit)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "GET_MESSAGES_FAILED", "查询消息失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "查询消息成功")
+}
+
+func (s *AppServer) sendMessageHandler(c *gin.Context) {
+	var req SendMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if req.Username == "" || req.Message == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_PARAMS", "缺少参数", "username and message are required")
+		return
+	}
+
+	result, err := s.xianyuService.SendMessage(c.Request.Context(), req.Username, req.Message, req.Limit)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "SEND_MESSAGE_FAILED", "发送消息失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "发送消息成功")
+}
+
 func healthHandler(c *gin.Context) {
 	respondSuccess(c, map[string]any{
 		"status":    "healthy",

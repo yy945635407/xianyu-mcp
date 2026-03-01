@@ -99,6 +99,63 @@ func (s *AppServer) handleSearchItems(ctx context.Context, keyword string, limit
 	}
 }
 
+func (s *AppServer) handleListConversations(ctx context.Context, limit int) *MCPToolResult {
+	result, err := s.xianyuService.ListConversations(ctx, limit)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "读取消息列表失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "读取成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleGetMessages(ctx context.Context, username string, limit int) *MCPToolResult {
+	result, err := s.xianyuService.GetConversationMessages(ctx, username, limit)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "查询消息失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "查询成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleSendMessage(ctx context.Context, username, message string, limit int) *MCPToolResult {
+	result, err := s.xianyuService.SendMessage(ctx, username, message, limit)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "发送消息失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "发送成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
 func normalizeQRCodeData(img string) string {
 	trimmed := strings.TrimSpace(img)
 	trimmed = strings.TrimPrefix(trimmed, "data:image/png;base64,")

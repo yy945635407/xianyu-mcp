@@ -8,6 +8,9 @@
 - `get_login_qrcode`：获取登录二维码
 - `delete_cookies`：清理 cookies 重置登录
 - `search_items`：按关键词搜索商品摘要
+- `list_conversations`：读取消息会话列表（用户名、最新消息、状态）
+- `get_messages`：按用户名查询消息（含商品上下文与订单状态）
+- `send_message`：按用户名发送消息
 - HTTP API 与 MCP Streamable HTTP 双入口
 
 ## 快速开始
@@ -28,6 +31,21 @@ MCP 地址：`http://localhost:18061/mcp`
 
 ```bash
 curl 'http://localhost:18061/api/v1/search?keyword=iphone&limit=5'
+```
+
+消息接口示例：
+
+```bash
+# 读取会话列表
+curl 'http://localhost:18061/api/v1/im/conversations?limit=20'
+
+# 查询某个用户名会话
+curl 'http://localhost:18061/api/v1/im/messages?username=发韧的树枝&limit=30'
+
+# 发送消息
+curl -X POST 'http://localhost:18061/api/v1/im/send' \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"发韧的树枝","message":"你好","limit":20}'
 ```
 
 ## 浏览器探索调试

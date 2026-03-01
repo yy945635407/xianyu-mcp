@@ -1,5 +1,7 @@
 package main
 
+import "github.com/ylyt_bot/xianyu-mcp/xianyu"
+
 type ErrorResponse struct {
 	Error   string `json:"error"`
 	Code    string `json:"code"`
@@ -53,4 +55,35 @@ type SearchItemsResponse struct {
 	Keyword string               `json:"keyword"`
 	Count   int                  `json:"count"`
 	Items   []SearchItemResponse `json:"items"`
+}
+
+type ListConversationsRequest struct {
+	Limit int `json:"limit,omitempty"`
+}
+
+type GetMessagesRequest struct {
+	Username string `json:"username" binding:"required"`
+	Limit    int    `json:"limit,omitempty"`
+}
+
+type SendMessageRequest struct {
+	Username string `json:"username" binding:"required"`
+	Message  string `json:"message" binding:"required"`
+	Limit    int    `json:"limit,omitempty"`
+}
+
+type ListConversationsResponse struct {
+	Count         int                          `json:"count"`
+	Conversations []xianyu.ConversationSummary `json:"conversations"`
+}
+
+type GetMessagesResponse struct {
+	Conversation xianyu.ConversationDetail `json:"conversation"`
+}
+
+type SendMessageResponse struct {
+	Username     string                    `json:"username"`
+	Message      string                    `json:"message"`
+	Sent         bool                      `json:"sent"`
+	Conversation xianyu.ConversationDetail `json:"conversation"`
 }

@@ -132,6 +132,68 @@ func (s *XianyuService) SearchItems(ctx context.Context, keyword string, limit i
 	}, nil
 }
 
+func (s *XianyuService) ListConversations(ctx context.Context, limit int) (*ListConversationsResponse, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 20
+	}
+
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewMessageAction(page)
+	conversations, err := action.ListConversations(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ListConversationsResponse{
+		Count:         len(conversations),
+		Conversations: conversations,
+	}, nil
+}
+
+func (s *XianyuService) GetConversationMessages(ctx context.Context, username string, limit int) (*GetMessagesResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewMessageAction(page)
+	detail, err := action.GetConversationByUsername(ctx, username, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GetMessagesResponse{
+		Conversation: *detail,
+	}, nil
+}
+
+func (s *XianyuService) SendMessage(ctx context.Context, username, message string, limit int) (*SendMessageResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewMessageAction(page)
+	detail, err := action.SendMessageToUser(ctx, username, message, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SendMessageResponse{
+		Username:     username,
+		Message:      message,
+		Sent:         true,
+		Conversation: *detail,
+	}, nil
+}
+
 func newBrowser() *headless_browser.Browser {
 	return browser.NewBrowser(configs.IsHeadless(), browser.WithBinPath(configs.GetBinPath()))
 }

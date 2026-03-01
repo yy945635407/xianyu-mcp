@@ -17,6 +17,21 @@ type SearchItemsArgs struct {
 	Limit   int    `json:"limit,omitempty" jsonschema:"返回条数限制，默认20，最大100"`
 }
 
+type ListConversationsArgs struct {
+	Limit int `json:"limit,omitempty" jsonschema:"返回会话条数限制，默认20"`
+}
+
+type GetMessagesArgs struct {
+	Username string `json:"username" jsonschema:"会话用户名"`
+	Limit    int    `json:"limit,omitempty" jsonschema:"返回消息条数限制，默认50"`
+}
+
+type SendMessageArgs struct {
+	Username string `json:"username" jsonschema:"会话用户名"`
+	Message  string `json:"message" jsonschema:"要发送的消息内容"`
+	Limit    int    `json:"limit,omitempty" jsonschema:"发送后返回最近消息条数限制，默认30"`
+}
+
 func InitMCPServer(appServer *AppServer) *mcp.Server {
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -108,7 +123,55 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 4 MCP tools")
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "list_conversations",
+			Description: "读取闲鱼消息会话列表，返回用户名、最新消息、交易状态",
+			Annotations: &mcp.ToolAnnotations{Title: "List Conversations", ReadOnlyHint: true},
+		},
+		withPanicRecovery("list_conversations", func(ctx context.Context, req *mcp.CallToolRequest, args ListConversationsArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleListConversations(ctx, args.Limit)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_messages",
+			Description: "按用户名查询会话消息，返回消息列表、商品上下文和订单状态（未下单/已拍下/我已发货/已收货）",
+			Annotations: &mcp.ToolAnnotations{Title: "Get Messages", ReadOnlyHint: true},
+		},
+		withPanicRecovery("get_messages", func(ctx context.Context, req *mcp.CallToolRequest, args GetMessagesArgs) (*mcp.CallToolResult, any, error) {
+			if args.Username == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 username 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleGetMessages(ctx, args.Username, args.Limit)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "send_message",
+			Description: "按用户名发送消息，并返回发送后会话摘要",
+			Annotations: &mcp.ToolAnnotations{Title: "Send Message", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("send_message", func(ctx context.Context, req *mcp.CallToolRequest, args SendMessageArgs) (*mcp.CallToolResult, any, error) {
+			if args.Username == "" || args.Message == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 username 或 message 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleSendMessage(ctx, args.Username, args.Message, args.Limit)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Info("Registered 7 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {
