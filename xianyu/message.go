@@ -340,61 +340,158 @@ func (a *MessageAction) SendMessageToUser(ctx context.Context, username, message
 		return nil, fmt.Errorf("conversation opened but UI not ready for user: %s", clickedName)
 	}
 
-	ok := pp.MustEval(`(text) => {
-		const ta = document.querySelector('textarea[placeholder*="请输入消息"], textarea[class*="ant-input"]');
-		if (!ta) return false;
-		ta.focus();
-		ta.value = '';
-		ta.dispatchEvent(new Event('input', { bubbles: true }));
-		ta.value = text;
-		ta.dispatchEvent(new Event('input', { bubbles: true }));
-		ta.dispatchEvent(new Event('change', { bubbles: true }));
-		return true;
-	}`, msg).Bool()
-	if !ok {
-		return nil, fmt.Errorf("message input box not found")
+	type messageSnapshot struct {
+		Count       int    `json:"count"`
+		Last        string `json:"last"`
+		TailMatches int    `json:"tail_matches"`
 	}
 
-	time.Sleep(300 * time.Millisecond)
-	_ = pp.Keyboard.Press(input.Enter)
-	time.Sleep(1500 * time.Millisecond)
+	type sendAttemptResult struct {
+		InputFound     bool   `json:"input_found"`
+		ButtonFound    bool   `json:"button_found"`
+		ButtonDisabled bool   `json:"button_disabled"`
+		Clicked        bool   `json:"clicked"`
+		ButtonText     string `json:"button_text"`
+		ButtonClass    string `json:"button_class"`
+	}
 
-	// confirm the message appears in outgoing bubbles
-	confirmed := pp.MustEval(`(text) => {
-		const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
-		const bubbles = Array.from(document.querySelectorAll('div[class*="message-text-right"]'));
-		for (let i = bubbles.length - 1; i >= 0 && i >= bubbles.length - 8; i--) {
-			const t = clean(bubbles[i].textContent);
-			if (t.includes(text)) return true;
-		}
-		return false;
-	}`, msg).Bool()
-	if !confirmed {
-		// send button fallback
-		_ = pp.MustEval(`() => {
-			const cands = Array.from(document.querySelectorAll('button,div,span'));
-			const target = cands.find((el) => {
-				const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
-				if (!t) return false;
-				return t === '发送' || t === '发 送' || t.endsWith('发送');
-			});
-			if (target && typeof target.click === 'function') {
-				target.click();
-				return true;
-			}
-			return false;
-		}`)
-		time.Sleep(1200 * time.Millisecond)
-		confirmed = pp.MustEval(`(text) => {
+	readSnapshot := func(targetText string) (*messageSnapshot, error) {
+		raw := pp.MustEval(`(targetText) => {
 			const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
-			const bubbles = Array.from(document.querySelectorAll('div[class*="message-text-right"]'));
-			for (let i = bubbles.length - 1; i >= 0 && i >= bubbles.length - 8; i--) {
-				const t = clean(bubbles[i].textContent);
-				if (t.includes(text)) return true;
-			}
-			return false;
-		}`, msg).Bool()
+			const rows = Array.from(document.querySelectorAll('li.ant-list-item'));
+			const tail = rows.slice(Math.max(0, rows.length - 20)).map((li) => clean(li.innerText || '')).filter(Boolean);
+			const target = clean(targetText);
+			return JSON.stringify({
+				count: rows.length,
+				last: tail.length > 0 ? tail[tail.length - 1] : '',
+				tail_matches: tail.filter((t) => target && t.includes(target)).length,
+			});
+		}`, targetText).String()
+
+		var snap messageSnapshot
+		if err := json.Unmarshal([]byte(raw), &snap); err != nil {
+			return nil, fmt.Errorf("unmarshal message snapshot failed: %w", err)
+		}
+		return &snap, nil
 	}
+
+	beforeSnap, err := readSnapshot(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	var sendResult sendAttemptResult
+	sentTriggered := false
+	var lastSendErr error
+
+	for i := 0; i < 3; i++ {
+		raw := pp.MustEval(`(text) => {
+			const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
+			const norm = (s) => clean(s).replace(/\s+/g, '');
+
+			const input = document.querySelector('textarea[placeholder*="请输入消息"], textarea[class*="textarea-no-border"], textarea.ant-input, textarea');
+			if (!input) {
+				return JSON.stringify({
+					input_found: false,
+					button_found: false,
+					button_disabled: false,
+					clicked: false,
+					button_text: '',
+					button_class: '',
+				});
+			}
+
+			input.focus();
+			const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+			if (setter) {
+				setter.call(input, '');
+				input.dispatchEvent(new Event('input', { bubbles: true }));
+				setter.call(input, text);
+				input.dispatchEvent(new Event('input', { bubbles: true }));
+			} else {
+				input.value = text;
+				input.dispatchEvent(new Event('input', { bubbles: true }));
+			}
+			input.dispatchEvent(new Event('change', { bubbles: true }));
+
+			const btnCandidates = Array.from(document.querySelectorAll('div[class*="sendbox-bottom"] button, button'));
+			const sendBtn = btnCandidates.find((el) => norm(el.textContent || '') === '发送');
+			if (!sendBtn) {
+				return JSON.stringify({
+					input_found: true,
+					button_found: false,
+					button_disabled: false,
+					clicked: false,
+					button_text: '',
+					button_class: '',
+				});
+			}
+
+			const disabled = !!sendBtn.disabled || sendBtn.getAttribute('aria-disabled') === 'true';
+			if (disabled) {
+				return JSON.stringify({
+					input_found: true,
+					button_found: true,
+					button_disabled: true,
+					clicked: false,
+					button_text: clean(sendBtn.textContent || ''),
+					button_class: (sendBtn.className || '').toString(),
+				});
+			}
+
+			sendBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+			sendBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+			sendBtn.click();
+
+			return JSON.stringify({
+				input_found: true,
+				button_found: true,
+				button_disabled: false,
+				clicked: true,
+				button_text: clean(sendBtn.textContent || ''),
+				button_class: (sendBtn.className || '').toString(),
+			});
+		}`, msg).String()
+
+		if err := json.Unmarshal([]byte(raw), &sendResult); err != nil {
+			lastSendErr = fmt.Errorf("unmarshal send attempt failed: %w", err)
+			time.Sleep(450 * time.Millisecond)
+			continue
+		}
+
+		if !sendResult.InputFound {
+			return nil, fmt.Errorf("message input box not found")
+		}
+
+		if sendResult.Clicked {
+			sentTriggered = true
+			break
+		}
+
+		// Some clients allow Enter to send; keep as a fallback path.
+		_ = pp.Keyboard.Press(input.Enter)
+		time.Sleep(600 * time.Millisecond)
+	}
+
+	if !sentTriggered && lastSendErr != nil {
+		return nil, lastSendErr
+	}
+
+	confirmed := false
+	for i := 0; i < 12; i++ {
+		afterSnap, snapErr := readSnapshot(msg)
+		if snapErr == nil {
+			grew := afterSnap.Count > beforeSnap.Count
+			moreMatches := afterSnap.TailMatches > beforeSnap.TailMatches
+			lastMatched := strings.Contains(afterSnap.Last, msg)
+			if (grew && (moreMatches || lastMatched)) || moreMatches {
+				confirmed = true
+				break
+			}
+		}
+		time.Sleep(650 * time.Millisecond)
+	}
+
 	if !confirmed {
 		return nil, fmt.Errorf("message might not be sent, no outgoing confirmation found")
 	}
@@ -450,16 +547,30 @@ func findConversationByUsername(pp *rod.Page, username string) string {
 
 		const normalizedTarget = normalize(target);
 		const items = Array.from(document.querySelectorAll('div[class*="conversation-item"]'));
+
+		// Phase 1: exact username match.
 		for (const item of items) {
 			const name = extractName(item);
 			if (!name || name.includes('通知消息')) continue;
 			const normalizedName = normalize(name);
-			const fullText = normalize(item.innerText || '');
+			if (normalizedName !== normalizedTarget) continue;
+			const clickable = item.querySelector('.ant-dropdown-trigger') || item.firstElementChild || item;
+			if (clickable) {
+				clickable.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+				clickable.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+				clickable.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+			}
+			return name;
+		}
+
+		// Phase 2: tolerant contains match on username only.
+		for (const item of items) {
+			const name = extractName(item);
+			if (!name || name.includes('通知消息')) continue;
+			const normalizedName = normalize(name);
 			if (
-				normalizedName === normalizedTarget ||
 				normalizedName.includes(normalizedTarget) ||
-				normalizedTarget.includes(normalizedName) ||
-				fullText.includes(normalizedTarget)
+				normalizedTarget.includes(normalizedName)
 			) {
 				const clickable = item.querySelector('.ant-dropdown-trigger') || item.firstElementChild || item;
 				if (clickable) {
