@@ -58,6 +58,7 @@ func (s *AppServer) Start(port string) error {
 	} else {
 		logrus.Info("服务器已优雅关闭")
 	}
+	s.xianyuService.Shutdown()
 
 	return nil
 }

@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -17,10 +20,37 @@ import (
 	"github.com/ylyt_bot/xianyu-mcp/xianyu"
 )
 
-type XianyuService struct{}
+type XianyuService struct {
+	pullMu         sync.Mutex
+	lastIMScanAt   time.Time
+	minIMScanEvery time.Duration
+}
 
 func NewXianyuService() *XianyuService {
-	return &XianyuService{}
+	minInterval := 8 * time.Second
+	if raw := strings.TrimSpace(os.Getenv("XIANYU_IM_SCAN_INTERVAL_MS")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v >= 1000 {
+			minInterval = time.Duration(v) * time.Millisecond
+		}
+	}
+	return &XianyuService{
+		minIMScanEvery: minInterval,
+	}
+}
+
+func (s *XianyuService) Shutdown() {
+	closeSharedBrowser()
+}
+
+func (s *XianyuService) shouldScanIMNow(now time.Time) bool {
+	s.pullMu.Lock()
+	defer s.pullMu.Unlock()
+
+	if s.lastIMScanAt.IsZero() || now.Sub(s.lastIMScanAt) >= s.minIMScanEvery {
+		s.lastIMScanAt = now
+		return true
+	}
+	return false
 }
 
 func (s *XianyuService) DeleteCookies(ctx context.Context) error {
@@ -292,26 +322,29 @@ func (s *XianyuService) PullIMEvents(ctx context.Context, req *PullIMEventsReque
 		scanLimit = 30
 	}
 
-	conversations, err := s.ListConversations(ctx, scanLimit)
-	if err != nil {
-		return nil, err
-	}
-
 	store, err := getIMEventStore()
 	if err != nil {
 		return nil, err
 	}
 
-	generated, err := store.CaptureConversations(conversations.Conversations)
-	if err != nil {
-		return nil, err
+	generatedCount := 0
+	if s.shouldScanIMNow(time.Now()) {
+		conversations, listErr := s.ListConversations(ctx, scanLimit)
+		if listErr != nil {
+			return nil, listErr
+		}
+		generated, capErr := store.CaptureConversations(conversations.Conversations)
+		if capErr != nil {
+			return nil, capErr
+		}
+		generatedCount = len(generated)
 	}
 
 	events, nextCursor := store.ListSinceID(req.SinceID, limit)
 	return &PullIMEventsResponse{
 		SinceID:    req.SinceID,
 		NextCursor: nextCursor,
-		Generated:  len(generated),
+		Generated:  generatedCount,
 		Count:      len(events),
 		Events:     events,
 	}, nil
@@ -1124,8 +1157,67 @@ func (s *XianyuService) HandleRefund(ctx context.Context, req *RefundActionReque
 	}, nil
 }
 
-func newBrowser() *headless_browser.Browser {
-	return browser.NewBrowser(configs.IsHeadless(), browser.WithBinPath(configs.GetBinPath()))
+type browserSession struct {
+	browser *headless_browser.Browser
+	closed  bool
+}
+
+func (s *browserSession) NewPage() *rod.Page {
+	return s.browser.NewPage()
+}
+
+func (s *browserSession) Close() {
+	sharedBrowserMu.Lock()
+	defer sharedBrowserMu.Unlock()
+	if s.closed {
+		return
+	}
+	s.closed = true
+	if sharedBrowserRefCount > 0 {
+		sharedBrowserRefCount--
+	}
+}
+
+var (
+	sharedBrowserMu       sync.Mutex
+	sharedBrowserInst     *headless_browser.Browser
+	sharedBrowserRefCount int
+	sharedBrowserHeadless bool
+	sharedBrowserBinPath  string
+)
+
+func newBrowser() *browserSession {
+	sharedBrowserMu.Lock()
+	defer sharedBrowserMu.Unlock()
+
+	headless := configs.IsHeadless()
+	binPath := configs.GetBinPath()
+	needRecreate := sharedBrowserInst == nil || sharedBrowserHeadless != headless || sharedBrowserBinPath != binPath
+	if needRecreate {
+		if sharedBrowserInst != nil {
+			sharedBrowserInst.Close()
+		}
+		sharedBrowserInst = browser.NewBrowser(headless, browser.WithBinPath(binPath))
+		sharedBrowserHeadless = headless
+		sharedBrowserBinPath = binPath
+		sharedBrowserRefCount = 0
+	}
+
+	sharedBrowserRefCount++
+	return &browserSession{browser: sharedBrowserInst}
+}
+
+func closeSharedBrowser() {
+	sharedBrowserMu.Lock()
+	defer sharedBrowserMu.Unlock()
+
+	if sharedBrowserInst != nil {
+		sharedBrowserInst.Close()
+	}
+	sharedBrowserInst = nil
+	sharedBrowserRefCount = 0
+	sharedBrowserHeadless = false
+	sharedBrowserBinPath = ""
 }
 
 func saveCookies(page *rod.Page) error {
