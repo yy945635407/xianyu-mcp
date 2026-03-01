@@ -72,6 +72,12 @@ type SendMessageRequest struct {
 	Limit    int    `json:"limit,omitempty"`
 }
 
+type PullIMEventsRequest struct {
+	SinceID   int64 `json:"since_id,omitempty"`
+	Limit     int   `json:"limit,omitempty"`
+	ScanLimit int   `json:"scan_limit,omitempty"`
+}
+
 type ListConversationsResponse struct {
 	Count         int                          `json:"count"`
 	Conversations []xianyu.ConversationSummary `json:"conversations"`
@@ -86,6 +92,14 @@ type SendMessageResponse struct {
 	Message      string                    `json:"message"`
 	Sent         bool                      `json:"sent"`
 	Conversation xianyu.ConversationDetail `json:"conversation"`
+}
+
+type PullIMEventsResponse struct {
+	SinceID    int64     `json:"since_id"`
+	NextCursor int64     `json:"next_cursor"`
+	Generated  int       `json:"generated"`
+	Count      int       `json:"count"`
+	Events     []IMEvent `json:"events"`
 }
 
 type PublishItemRequest struct {

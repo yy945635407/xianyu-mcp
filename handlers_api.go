@@ -160,6 +160,52 @@ func (s *AppServer) getMessagesHandler(c *gin.Context) {
 	respondSuccess(c, result, "查询消息成功")
 }
 
+func (s *AppServer) pullIMEventsHandler(c *gin.Context) {
+	var req PullIMEventsRequest
+
+	switch c.Request.Method {
+	case http.MethodPost:
+		if err := c.ShouldBindJSON(&req); err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+			return
+		}
+	default:
+		if sinceIDStr := c.Query("since_id"); sinceIDStr != "" {
+			v, err := strconv.ParseInt(sinceIDStr, 10, 64)
+			if err != nil {
+				respondError(c, http.StatusBadRequest, "INVALID_SINCE_ID", "since_id 必须是整数", err.Error())
+				return
+			}
+			req.SinceID = v
+		}
+		if limitStr := c.Query("limit"); limitStr != "" {
+			v, err := strconv.Atoi(limitStr)
+			if err != nil {
+				respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "limit 必须是整数", err.Error())
+				return
+			}
+			req.Limit = v
+		}
+		if scanStr := c.Query("scan_limit"); scanStr != "" {
+			v, err := strconv.Atoi(scanStr)
+			if err != nil {
+				respondError(c, http.StatusBadRequest, "INVALID_SCAN_LIMIT", "scan_limit 必须是整数", err.Error())
+				return
+			}
+			req.ScanLimit = v
+		}
+	}
+
+	result, err := s.xianyuService.PullIMEvents(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "PULL_IM_EVENTS_FAILED", "拉取增量消息失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "拉取增量消息成功")
+}
+
 func (s *AppServer) sendMessageHandler(c *gin.Context) {
 	var req SendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -39,6 +39,8 @@ func setupRoutes(appServer *AppServer) *gin.Engine {
 		api.GET("/im/conversations", appServer.listConversationsHandler)
 		api.GET("/im/messages", appServer.getMessagesHandler)
 		api.POST("/im/messages", appServer.getMessagesHandler)
+		api.GET("/im/events", appServer.pullIMEventsHandler)
+		api.POST("/im/events", appServer.pullIMEventsHandler)
 		api.POST("/im/send", appServer.sendMessageHandler)
 		api.POST("/publish/item", appServer.publishItemHandler)
 		api.GET("/orders/list", appServer.listOrdersHandler)

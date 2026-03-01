@@ -194,6 +194,41 @@ func (s *XianyuService) SendMessage(ctx context.Context, username, message strin
 	}, nil
 }
 
+func (s *XianyuService) PullIMEvents(ctx context.Context, req *PullIMEventsRequest) (*PullIMEventsResponse, error) {
+	limit := req.Limit
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	scanLimit := req.ScanLimit
+	if scanLimit <= 0 || scanLimit > 200 {
+		scanLimit = 30
+	}
+
+	conversations, err := s.ListConversations(ctx, scanLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := getIMEventStore()
+	if err != nil {
+		return nil, err
+	}
+
+	generated, err := store.CaptureConversations(conversations.Conversations)
+	if err != nil {
+		return nil, err
+	}
+
+	events, nextCursor := store.ListSinceID(req.SinceID, limit)
+	return &PullIMEventsResponse{
+		SinceID:    req.SinceID,
+		NextCursor: nextCursor,
+		Generated:  len(generated),
+		Count:      len(events),
+		Events:     events,
+	}, nil
+}
+
 func (s *XianyuService) PublishItem(ctx context.Context, req *PublishItemRequest) (*PublishItemResponse, error) {
 	b := newBrowser()
 	defer b.Close()

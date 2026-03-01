@@ -137,6 +137,25 @@ func (s *AppServer) handleGetMessages(ctx context.Context, username string, limi
 	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
 }
 
+func (s *AppServer) handlePullIMEvents(ctx context.Context, req PullIMEventsRequest) *MCPToolResult {
+	result, err := s.xianyuService.PullIMEvents(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "拉取增量消息失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "拉取成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
 func (s *AppServer) handleSendMessage(ctx context.Context, username, message string, limit int) *MCPToolResult {
 	result, err := s.xianyuService.SendMessage(ctx, username, message, limit)
 	if err != nil {

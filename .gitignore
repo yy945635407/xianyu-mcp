@@ -1,5 +1,6 @@
 .DS_Store
 cookies.json
+data/
 /tmp/
 *.log
 bin/

@@ -27,6 +27,12 @@ type GetMessagesArgs struct {
 	Limit    int    `json:"limit,omitempty" jsonschema:"返回消息条数限制，默认50"`
 }
 
+type PullIMEventsArgs struct {
+	SinceID   int64 `json:"since_id,omitempty" jsonschema:"游标ID，只返回大于该ID的增量事件"`
+	Limit     int   `json:"limit,omitempty" jsonschema:"返回事件条数限制，默认100"`
+	ScanLimit int   `json:"scan_limit,omitempty" jsonschema:"扫描会话条数限制，默认30"`
+}
+
 type SendMessageArgs struct {
 	Username string `json:"username" jsonschema:"会话用户名"`
 	Message  string `json:"message" jsonschema:"要发送的消息内容"`
@@ -283,6 +289,22 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 				}, nil, nil
 			}
 			result := appServer.handleGetMessages(ctx, args.Username, args.Limit)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "pull_im_events",
+			Description: "拉取 IM 增量事件流（支持 since_id 游标）",
+			Annotations: &mcp.ToolAnnotations{Title: "Pull IM Events", ReadOnlyHint: true},
+		},
+		withPanicRecovery("pull_im_events", func(ctx context.Context, req *mcp.CallToolRequest, args PullIMEventsArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handlePullIMEvents(ctx, PullIMEventsRequest{
+				SinceID:   args.SinceID,
+				Limit:     args.Limit,
+				ScanLimit: args.ScanLimit,
+			})
 			return convertToMCPResult(result), nil, nil
 		}),
 	)
@@ -737,7 +759,7 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 31 MCP tools")
+	logrus.Info("Registered 32 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {
