@@ -529,7 +529,9 @@ func (s *XianyuService) MatchIMKnowledge(ctx context.Context, req *MatchIMKnowle
 	username := strings.TrimSpace(req.Username)
 
 	if req.AutoContext && username != "" && (itemRef == "" || orderStatus == "") {
-		detail, err := s.GetConversationMessages(ctx, username, 30)
+		autoCtx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+		detail, err := s.GetConversationMessages(autoCtx, username, 30)
+		cancel()
 		if err != nil {
 			logrus.Warnf("load conversation for kb auto context failed: %v", err)
 		} else {

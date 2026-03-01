@@ -62,7 +62,34 @@ func NewMessageAction(page *rod.Page) *MessageAction {
 	}
 }
 
-func (a *MessageAction) ListConversations(ctx context.Context, limit int) ([]ConversationSummary, error) {
+func safeMustEvalBool(pp *rod.Page, script string, args ...interface{}) (out bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("rod eval bool panic: %v", r)
+		}
+	}()
+	out = pp.MustEval(script, args...).Bool()
+	return out, nil
+}
+
+func safeMustEvalString(pp *rod.Page, script string, args ...interface{}) (out string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("rod eval string panic: %v", r)
+		}
+	}()
+	out = pp.MustEval(script, args...).String()
+	return out, nil
+}
+
+func (a *MessageAction) ListConversations(ctx context.Context, limit int) (conversations []ConversationSummary, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("list conversations panic: %v", r)
+			conversations = nil
+		}
+	}()
+
 	if limit <= 0 || limit > 200 {
 		limit = 20
 	}
@@ -74,10 +101,20 @@ func (a *MessageAction) ListConversations(ctx context.Context, limit int) ([]Con
 	}
 
 	extract := func() ([]ConversationSummary, error) {
-		raw := pp.MustEval(`(limit) => {
+		raw, err := safeMustEvalString(pp, `(limit) => {
 			const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
 			const isTime = (s) => /(今天|昨天|前天|刚刚|\d{1,2}分钟前|\d{1,2}小时前|\d{2}-\d{2}|\d{2}:\d{2})/.test(s);
 			const isStatus = (s) => /交易成功|有新交易评价|待付款|待发货|待收货|已收货/.test(s);
+			const isLikelyUsername = (s) => {
+				const v = clean(s);
+				if (!v) return false;
+				if (isTime(v) || isStatus(v)) return false;
+				if (v.includes('通知消息')) return false;
+				if (v.length > 24) return false;
+				if (/快给ta一个评价吧|交易成功|我完成了评价|你撤回了一条消息|待付款|待发货|待收货|已收货/.test(v)) return false;
+				if (/[，。！？,.!?]/.test(v) && v.length > 8) return false;
+				return true;
+			};
 
 			const normalizeOrderStatus = (txt) => {
 				if (!txt) return '未下单';
@@ -97,8 +134,14 @@ func (a *MessageAction) ListConversations(ctx context.Context, limit int) ([]Con
 				let lines = (item.innerText || '').split('\n').map((s) => clean(s)).filter(Boolean);
 				if (lines.length === 0) continue;
 				if (/^\d+$/.test(lines[0])) lines = lines.slice(1);
-				const username = lines[0] || '';
-				if (!username || username.includes('通知消息')) {
+				let username = lines[0] || '';
+				const nodeName = clean(
+					item.querySelector('span[class*="name"],div[class*="name"],span[class*="title"],div[class*="title"]')?.textContent || ''
+				);
+				if (isLikelyUsername(nodeName)) {
+					username = nodeName;
+				}
+				if (!isLikelyUsername(username)) {
 					continue;
 				}
 
@@ -134,7 +177,10 @@ func (a *MessageAction) ListConversations(ctx context.Context, limit int) ([]Con
 			}
 
 			return JSON.stringify(result);
-		}`, limit).String()
+		}`, limit)
+		if err != nil {
+			return nil, err
+		}
 
 		var conversations []ConversationSummary
 		if err := json.Unmarshal([]byte(raw), &conversations); err != nil {
@@ -143,8 +189,6 @@ func (a *MessageAction) ListConversations(ctx context.Context, limit int) ([]Con
 		return conversations, nil
 	}
 
-	var conversations []ConversationSummary
-	var err error
 	for i := 0; i < 3; i++ {
 		conversations, err = extract()
 		if err != nil {
@@ -158,7 +202,14 @@ func (a *MessageAction) ListConversations(ctx context.Context, limit int) ([]Con
 	return conversations, nil
 }
 
-func (a *MessageAction) GetConversationByUsername(ctx context.Context, username string, limit int) (*ConversationDetail, error) {
+func (a *MessageAction) GetConversationByUsername(ctx context.Context, username string, limit int) (detailOut *ConversationDetail, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("get conversation panic: %v", r)
+			detailOut = nil
+		}
+	}()
+
 	if strings.TrimSpace(username) == "" {
 		return nil, fmt.Errorf("username is required")
 	}
@@ -185,7 +236,7 @@ func (a *MessageAction) GetConversationByUsername(ctx context.Context, username 
 		return nil, fmt.Errorf("conversation opened but UI not ready for user: %s", clickedName)
 	}
 
-	raw := pp.MustEval(`(limit) => {
+	raw, evalErr := safeMustEvalString(pp, `(limit) => {
 		const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
 
 		const normalizeOrderStatus = (txt) => {
@@ -295,7 +346,10 @@ func (a *MessageAction) GetConversationByUsername(ctx context.Context, username 
 		}
 
 		return JSON.stringify(detail);
-	}`, limit).String()
+	}`, limit)
+	if evalErr != nil {
+		return nil, evalErr
+	}
 
 	var detail ConversationDetail
 	if err := json.Unmarshal([]byte(raw), &detail); err != nil {
@@ -309,10 +363,18 @@ func (a *MessageAction) GetConversationByUsername(ctx context.Context, username 
 		detail.OrderStatus = "未下单"
 	}
 
-	return &detail, nil
+	detailOut = &detail
+	return detailOut, nil
 }
 
-func (a *MessageAction) SendMessageToUser(ctx context.Context, username, message string, verifyLimit int) (*ConversationDetail, error) {
+func (a *MessageAction) SendMessageToUser(ctx context.Context, username, message string, verifyLimit int) (detailOut *ConversationDetail, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("send message panic: %v", r)
+			detailOut = nil
+		}
+	}()
+
 	if strings.TrimSpace(username) == "" {
 		return nil, fmt.Errorf("username is required")
 	}
@@ -505,13 +567,16 @@ func (a *MessageAction) SendMessageToUser(ctx context.Context, username, message
 func waitIMConversationReady(pp *rod.Page, expectedUsername string) bool {
 	target := strings.TrimSpace(expectedUsername)
 	for i := 0; i < 12; i++ {
-		ready := pp.MustEval(`(expected) => {
+		ready, err := safeMustEvalBool(pp, `(expected) => {
 			const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
 			const topbarName = clean(document.querySelector('div[class*="message-topbar"] span[class*="text1"]')?.textContent || '');
 			if (!topbarName) return false;
 			if (!expected) return true;
 			return topbarName.includes(expected) || expected.includes(topbarName);
-		}`, target).Bool()
+		}`, target)
+		if err != nil {
+			return false
+		}
 		if ready {
 			return true
 		}
@@ -522,10 +587,13 @@ func waitIMConversationReady(pp *rod.Page, expectedUsername string) bool {
 
 func waitIMConversationListReady(pp *rod.Page) bool {
 	for i := 0; i < 20; i++ {
-		ready := pp.MustEval(`() => {
+		ready, err := safeMustEvalBool(pp, `() => {
 			const count = document.querySelectorAll('div[class*="conversation-item"]').length;
 			return count > 0;
-		}`).Bool()
+		}`)
+		if err != nil {
+			return false
+		}
 		if ready {
 			return true
 		}
@@ -535,7 +603,7 @@ func waitIMConversationListReady(pp *rod.Page) bool {
 }
 
 func findConversationByUsername(pp *rod.Page, username string) string {
-	return pp.MustEval(`(target) => {
+	value, err := safeMustEvalString(pp, `(target) => {
 		const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
 		const normalize = (s) => clean(s).toLowerCase().replace(/[^0-9a-z\u4e00-\u9fa5]/g, '');
 		const extractName = (item) => {
@@ -582,5 +650,9 @@ func findConversationByUsername(pp *rod.Page, username string) string {
 			}
 		}
 		return '';
-	}`, username).String()
+	}`, username)
+	if err != nil {
+		return ""
+	}
+	return value
 }
