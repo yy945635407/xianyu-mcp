@@ -212,3 +212,7 @@ type GetItemDetailResponse struct {
 type ItemOperateResponse struct {
 	Result xianyu.ItemActionResult `json:"result"`
 }
+
+type AccountSecurityResponse struct {
+	Result xianyu.AccountSecurityInfo `json:"result"`
+}

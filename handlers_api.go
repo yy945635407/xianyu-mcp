@@ -483,6 +483,17 @@ func (s *AppServer) buyItemHandler(c *gin.Context) {
 	respondSuccess(c, result, "立即购买操作执行完成")
 }
 
+func (s *AppServer) getAccountSecurityHandler(c *gin.Context) {
+	result, err := s.xianyuService.GetAccountSecurity(c.Request.Context())
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "GET_ACCOUNT_SECURITY_FAILED", "读取账号与安全信息失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "读取账号与安全信息成功")
+}
+
 func healthHandler(c *gin.Context) {
 	respondSuccess(c, map[string]any{
 		"status":    "healthy",

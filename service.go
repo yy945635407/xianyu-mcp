@@ -495,6 +495,24 @@ func (s *XianyuService) BuyItem(ctx context.Context, req *BuyItemRequest) (*Item
 	}, nil
 }
 
+func (s *XianyuService) GetAccountSecurity(ctx context.Context) (*AccountSecurityResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewAccountAction(page)
+	result, err := action.GetAccountSecurity(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AccountSecurityResponse{
+		Result: *result,
+	}, nil
+}
+
 func newBrowser() *headless_browser.Browser {
 	return browser.NewBrowser(configs.IsHeadless(), browser.WithBinPath(configs.GetBinPath()))
 }

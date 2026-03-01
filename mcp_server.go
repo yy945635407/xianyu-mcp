@@ -121,6 +121,8 @@ type BuyItemArgs struct {
 	ItemRef string `json:"item_ref" jsonschema:"商品链接或商品ID"`
 }
 
+type GetAccountSecurityArgs struct{}
+
 func InitMCPServer(appServer *AppServer) *mcp.Server {
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -550,7 +552,19 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 22 MCP tools")
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_account_security",
+			Description: "读取账号与安全页面信息（基本信息、认证状态、安全中心）",
+			Annotations: &mcp.ToolAnnotations{Title: "Get Account Security", ReadOnlyHint: true},
+		},
+		withPanicRecovery("get_account_security", func(ctx context.Context, req *mcp.CallToolRequest, _ GetAccountSecurityArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleGetAccountSecurity(ctx)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Info("Registered 23 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {
