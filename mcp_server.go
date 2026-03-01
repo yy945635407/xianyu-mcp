@@ -104,6 +104,23 @@ type DeleteMyItemArgs struct {
 	Tab     string `json:"tab,omitempty" jsonschema:"页签：在售|已售出|下架"`
 }
 
+type GetItemDetailArgs struct {
+	ItemRef string `json:"item_ref" jsonschema:"商品链接或商品ID"`
+}
+
+type FavoriteItemArgs struct {
+	ItemRef string `json:"item_ref" jsonschema:"商品链接或商品ID"`
+}
+
+type ChatItemArgs struct {
+	ItemRef string `json:"item_ref" jsonschema:"商品链接或商品ID"`
+	Message string `json:"message,omitempty" jsonschema:"可选，打开会话后自动发送的首条消息"`
+}
+
+type BuyItemArgs struct {
+	ItemRef string `json:"item_ref" jsonschema:"商品链接或商品ID"`
+}
+
 func InitMCPServer(appServer *AppServer) *mcp.Server {
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -458,7 +475,82 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 18 MCP tools")
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "get_item_detail",
+			Description: "读取商品详情（标题、价格、卖家、想要人数、聊一聊链接、立即购买链接等）",
+			Annotations: &mcp.ToolAnnotations{Title: "Get Item Detail", ReadOnlyHint: true},
+		},
+		withPanicRecovery("get_item_detail", func(ctx context.Context, req *mcp.CallToolRequest, args GetItemDetailArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.ItemRef) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 item_ref 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleGetItemDetail(ctx, args.ItemRef)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "favorite_item",
+			Description: "触发商品收藏动作",
+			Annotations: &mcp.ToolAnnotations{Title: "Favorite Item", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("favorite_item", func(ctx context.Context, req *mcp.CallToolRequest, args FavoriteItemArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.ItemRef) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 item_ref 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleFavoriteItem(ctx, FavoriteItemRequest{ItemRef: args.ItemRef})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "chat_item",
+			Description: "打开商品“聊一聊”会话；可选 message 自动发送首条消息",
+			Annotations: &mcp.ToolAnnotations{Title: "Chat Item", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("chat_item", func(ctx context.Context, req *mcp.CallToolRequest, args ChatItemArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.ItemRef) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 item_ref 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleChatItem(ctx, ChatItemRequest{
+				ItemRef: args.ItemRef,
+				Message: args.Message,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "buy_item",
+			Description: "触发商品“立即购买”动作并返回创建订单链接",
+			Annotations: &mcp.ToolAnnotations{Title: "Buy Item", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("buy_item", func(ctx context.Context, req *mcp.CallToolRequest, args BuyItemArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.ItemRef) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 item_ref 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleBuyItem(ctx, BuyItemRequest{ItemRef: args.ItemRef})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Info("Registered 22 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {

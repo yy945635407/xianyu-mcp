@@ -423,6 +423,78 @@ func (s *XianyuService) DeleteMyItem(ctx context.Context, req *DeleteMyItemReque
 	}, nil
 }
 
+func (s *XianyuService) GetItemDetail(ctx context.Context, itemRef string) (*GetItemDetailResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewItemDetailAction(page)
+	result, err := action.GetDetail(ctx, itemRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GetItemDetailResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) FavoriteItem(ctx context.Context, req *FavoriteItemRequest) (*ItemOperateResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewItemDetailAction(page)
+	result, err := action.Favorite(ctx, req.ItemRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ItemOperateResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) ChatItem(ctx context.Context, req *ChatItemRequest) (*ItemOperateResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewItemDetailAction(page)
+	result, err := action.Chat(ctx, req.ItemRef, req.Message)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ItemOperateResponse{
+		Result: *result,
+	}, nil
+}
+
+func (s *XianyuService) BuyItem(ctx context.Context, req *BuyItemRequest) (*ItemOperateResponse, error) {
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewItemDetailAction(page)
+	result, err := action.Buy(ctx, req.ItemRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ItemOperateResponse{
+		Result: *result,
+	}, nil
+}
+
 func newBrowser() *headless_browser.Browser {
 	return browser.NewBrowser(configs.IsHeadless(), browser.WithBinPath(configs.GetBinPath()))
 }

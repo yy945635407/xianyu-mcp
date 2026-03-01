@@ -51,6 +51,10 @@ func setupRoutes(appServer *AppServer) *gin.Engine {
 		api.POST("/my/items/edit", appServer.editMyItemHandler)
 		api.POST("/my/items/shelf", appServer.shelfMyItemHandler)
 		api.POST("/my/items/delete", appServer.deleteMyItemHandler)
+		api.GET("/item/detail", appServer.getItemDetailHandler)
+		api.POST("/item/favorite", appServer.favoriteItemHandler)
+		api.POST("/item/chat", appServer.chatItemHandler)
+		api.POST("/item/buy", appServer.buyItemHandler)
 	}
 
 	return router

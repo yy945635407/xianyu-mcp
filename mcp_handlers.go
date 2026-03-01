@@ -365,6 +365,82 @@ func (s *AppServer) handleDeleteMyItem(ctx context.Context, req DeleteMyItemRequ
 	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
 }
 
+func (s *AppServer) handleGetItemDetail(ctx context.Context, itemRef string) *MCPToolResult {
+	result, err := s.xianyuService.GetItemDetail(ctx, itemRef)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "读取商品详情失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "读取成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleFavoriteItem(ctx context.Context, req FavoriteItemRequest) *MCPToolResult {
+	result, err := s.xianyuService.FavoriteItem(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "收藏操作失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "收藏执行完成但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleChatItem(ctx context.Context, req ChatItemRequest) *MCPToolResult {
+	result, err := s.xianyuService.ChatItem(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "聊一聊操作失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "聊一聊执行完成但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
+func (s *AppServer) handleBuyItem(ctx context.Context, req BuyItemRequest) *MCPToolResult {
+	result, err := s.xianyuService.BuyItem(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "立即购买操作失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "立即购买执行完成但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
 func normalizeQRCodeData(img string) string {
 	trimmed := strings.TrimSpace(img)
 	trimmed = strings.TrimPrefix(trimmed, "data:image/png;base64,")

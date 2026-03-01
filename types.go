@@ -187,3 +187,28 @@ type ListMyItemsResponse struct {
 type MyItemActionResponse struct {
 	Result xianyu.MyItemActionResult `json:"result"`
 }
+
+type GetItemDetailRequest struct {
+	ItemRef string `json:"item_ref" binding:"required"` // 商品链接或商品ID
+}
+
+type FavoriteItemRequest struct {
+	ItemRef string `json:"item_ref" binding:"required"`
+}
+
+type ChatItemRequest struct {
+	ItemRef string `json:"item_ref" binding:"required"`
+	Message string `json:"message,omitempty"`
+}
+
+type BuyItemRequest struct {
+	ItemRef string `json:"item_ref" binding:"required"`
+}
+
+type GetItemDetailResponse struct {
+	Result xianyu.ItemDetail `json:"result"`
+}
+
+type ItemOperateResponse struct {
+	Result xianyu.ItemActionResult `json:"result"`
+}

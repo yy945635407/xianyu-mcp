@@ -403,6 +403,86 @@ func (s *AppServer) deleteMyItemHandler(c *gin.Context) {
 	respondSuccess(c, result, "删除宝贝执行完成")
 }
 
+func (s *AppServer) getItemDetailHandler(c *gin.Context) {
+	itemRef := c.Query("item_ref")
+	if itemRef == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_ITEM_REF", "缺少商品参数", "item_ref is required")
+		return
+	}
+
+	result, err := s.xianyuService.GetItemDetail(c.Request.Context(), itemRef)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "GET_ITEM_DETAIL_FAILED", "读取商品详情失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "读取商品详情成功")
+}
+
+func (s *AppServer) favoriteItemHandler(c *gin.Context) {
+	var req FavoriteItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if req.ItemRef == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_ITEM_REF", "缺少商品参数", "item_ref is required")
+		return
+	}
+
+	result, err := s.xianyuService.FavoriteItem(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "FAVORITE_ITEM_FAILED", "收藏操作失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "收藏操作执行完成")
+}
+
+func (s *AppServer) chatItemHandler(c *gin.Context) {
+	var req ChatItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if req.ItemRef == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_ITEM_REF", "缺少商品参数", "item_ref is required")
+		return
+	}
+
+	result, err := s.xianyuService.ChatItem(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "CHAT_ITEM_FAILED", "聊一聊操作失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "聊一聊操作执行完成")
+}
+
+func (s *AppServer) buyItemHandler(c *gin.Context) {
+	var req BuyItemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+	if req.ItemRef == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_ITEM_REF", "缺少商品参数", "item_ref is required")
+		return
+	}
+
+	result, err := s.xianyuService.BuyItem(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "BUY_ITEM_FAILED", "立即购买操作失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "立即购买操作执行完成")
+}
+
 func healthHandler(c *gin.Context) {
 	respondSuccess(c, map[string]any{
 		"status":    "healthy",
