@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -375,6 +376,287 @@ func (s *XianyuService) MarkIMSessionRead(ctx context.Context, req *MarkIMSessio
 		return nil, err
 	}
 	return &IMSessionStateResponse{State: state}, nil
+}
+
+func normalizeMatchText(v string) string {
+	replacer := strings.NewReplacer(
+		"\n", " ",
+		"\t", " ",
+		",", " ",
+		"，", " ",
+		".", " ",
+		"。", " ",
+		":", " ",
+		"：", " ",
+		";", " ",
+		"；", " ",
+		"?", " ",
+		"？", " ",
+		"!", " ",
+		"！", " ",
+		"(", " ",
+		")", " ",
+		"（", " ",
+		"）", " ",
+	)
+	cleaned := strings.ToLower(strings.TrimSpace(replacer.Replace(v)))
+	return strings.Join(strings.Fields(cleaned), " ")
+}
+
+func compactMatchText(v string) string {
+	return strings.ReplaceAll(v, " ", "")
+}
+
+func containsFuzzy(a, b string) bool {
+	left := compactMatchText(normalizeMatchText(a))
+	right := compactMatchText(normalizeMatchText(b))
+	if left == "" || right == "" {
+		return false
+	}
+	return strings.Contains(left, right) || strings.Contains(right, left)
+}
+
+func containsStatus(statuses []string, target string) bool {
+	for _, st := range statuses {
+		if st == target {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *XianyuService) UpsertIMKnowledge(ctx context.Context, req *UpsertIMKnowledgeRequest) (*IMKnowledgeEntryResponse, error) {
+	store, err := getIMKnowledgeStore()
+	if err != nil {
+		return nil, err
+	}
+	entry, err := store.Upsert(req)
+	if err != nil {
+		return nil, err
+	}
+	return &IMKnowledgeEntryResponse{Entry: entry}, nil
+}
+
+func (s *XianyuService) ListIMKnowledge(ctx context.Context, req *ListIMKnowledgeRequest) (*IMKnowledgeListResponse, error) {
+	store, err := getIMKnowledgeStore()
+	if err != nil {
+		return nil, err
+	}
+
+	limit := req.Limit
+	if limit <= 0 || limit > 1000 {
+		limit = 100
+	}
+
+	itemRef := strings.TrimSpace(req.ItemRef)
+	status := normalizeOrderStatus(req.OrderStatus)
+	queryNorm := normalizeMatchText(req.Query)
+	enabled := req.Enabled
+
+	allEntries := store.ListAll()
+	filtered := make([]IMKnowledgeEntry, 0, len(allEntries))
+	for _, entry := range allEntries {
+		if enabled != nil && entry.Enabled != *enabled {
+			continue
+		}
+		if itemRef != "" && entry.ItemRef != "" && !containsFuzzy(itemRef, entry.ItemRef) {
+			continue
+		}
+		if status != "" && len(entry.OrderStatuses) > 0 && !containsStatus(entry.OrderStatuses, status) {
+			continue
+		}
+		if queryNorm != "" {
+			matched := containsFuzzy(entry.Title, queryNorm) || containsFuzzy(entry.Answer, queryNorm)
+			if !matched {
+				for _, kw := range entry.Keywords {
+					if containsFuzzy(kw, queryNorm) {
+						matched = true
+						break
+					}
+				}
+			}
+			if !matched {
+				for _, tag := range entry.Tags {
+					if containsFuzzy(tag, queryNorm) {
+						matched = true
+						break
+					}
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		filtered = append(filtered, entry)
+	}
+
+	if len(filtered) > limit {
+		filtered = filtered[:limit]
+	}
+	return &IMKnowledgeListResponse{
+		Count:   len(filtered),
+		Entries: filtered,
+	}, nil
+}
+
+func (s *XianyuService) DeleteIMKnowledge(ctx context.Context, req *DeleteIMKnowledgeRequest) (*DeleteIMKnowledgeResponse, error) {
+	store, err := getIMKnowledgeStore()
+	if err != nil {
+		return nil, err
+	}
+	deleted, err := store.Delete(req.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &DeleteIMKnowledgeResponse{
+		ID:      strings.TrimSpace(req.ID),
+		Deleted: deleted,
+	}, nil
+}
+
+func (s *XianyuService) MatchIMKnowledge(ctx context.Context, req *MatchIMKnowledgeRequest) (*MatchIMKnowledgeResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("request is required")
+	}
+
+	question := strings.TrimSpace(req.Message)
+	if question == "" {
+		return nil, fmt.Errorf("message is required")
+	}
+
+	itemRef := strings.TrimSpace(req.ItemRef)
+	orderStatus := normalizeOrderStatus(req.OrderStatus)
+	username := strings.TrimSpace(req.Username)
+
+	if req.AutoContext && username != "" && (itemRef == "" || orderStatus == "") {
+		detail, err := s.GetConversationMessages(ctx, username, 30)
+		if err != nil {
+			logrus.Warnf("load conversation for kb auto context failed: %v", err)
+		} else {
+			if itemRef == "" {
+				itemRef = strings.TrimSpace(detail.Conversation.ProductContext.ProductRef)
+			}
+			if orderStatus == "" {
+				orderStatus = normalizeOrderStatus(detail.Conversation.OrderStatus)
+			}
+		}
+	}
+
+	topK := req.TopK
+	if topK <= 0 || topK > 20 {
+		topK = 3
+	}
+
+	store, err := getIMKnowledgeStore()
+	if err != nil {
+		return nil, err
+	}
+
+	questionNorm := normalizeMatchText(question)
+	questionCompact := compactMatchText(questionNorm)
+
+	type scoredEntry struct {
+		Entry   IMKnowledgeEntry
+		Score   int
+		Matched []string
+	}
+
+	scored := make([]scoredEntry, 0, 32)
+	for _, entry := range store.ListAll() {
+		if !entry.Enabled {
+			continue
+		}
+
+		score := entry.Priority
+		matchedKeywords := make([]string, 0, len(entry.Keywords))
+		for _, kw := range entry.Keywords {
+			kwNorm := normalizeMatchText(kw)
+			if kwNorm == "" {
+				continue
+			}
+			kwCompact := compactMatchText(kwNorm)
+			if strings.Contains(questionNorm, kwNorm) || strings.Contains(questionCompact, kwCompact) {
+				matchedKeywords = append(matchedKeywords, kw)
+				score += 20 + len([]rune(kwNorm))/4
+			}
+		}
+
+		if len(matchedKeywords) == 0 {
+			continue
+		}
+
+		if itemRef != "" {
+			if entry.ItemRef == "" {
+				score += 2
+			} else if containsFuzzy(itemRef, entry.ItemRef) {
+				score += 12
+			} else {
+				continue
+			}
+		}
+
+		if orderStatus != "" {
+			if len(entry.OrderStatuses) == 0 {
+				score += 1
+			} else if containsStatus(entry.OrderStatuses, orderStatus) {
+				score += 8
+			} else {
+				continue
+			}
+		}
+
+		if entry.Title != "" && containsFuzzy(question, entry.Title) {
+			score += 3
+		}
+		if containsFuzzy(question, entry.Answer) {
+			score += 2
+		}
+
+		scored = append(scored, scoredEntry{
+			Entry:   entry,
+			Score:   score,
+			Matched: matchedKeywords,
+		})
+	}
+
+	sort.Slice(scored, func(i, j int) bool {
+		if scored[i].Score != scored[j].Score {
+			return scored[i].Score > scored[j].Score
+		}
+		return scored[i].Entry.UpdatedAt > scored[j].Entry.UpdatedAt
+	})
+	if len(scored) > topK {
+		scored = scored[:topK]
+	}
+
+	matches := make([]IMKnowledgeMatch, 0, len(scored))
+	for _, row := range scored {
+		matches = append(matches, IMKnowledgeMatch{
+			ID:              row.Entry.ID,
+			Title:           row.Entry.Title,
+			Answer:          row.Entry.Answer,
+			ItemRef:         row.Entry.ItemRef,
+			OrderStatuses:   row.Entry.OrderStatuses,
+			Tags:            row.Entry.Tags,
+			Score:           row.Score,
+			MatchedKeywords: row.Matched,
+		})
+	}
+
+	bestAnswer := ""
+	if len(matches) > 0 {
+		bestAnswer = matches[0].Answer
+	}
+
+	return &MatchIMKnowledgeResponse{
+		Message:     question,
+		Username:    username,
+		ItemRef:     itemRef,
+		OrderStatus: orderStatus,
+		Count:       len(matches),
+		BestAnswer:  bestAnswer,
+		Matches:     matches,
+	}, nil
 }
 
 func (s *XianyuService) PublishItem(ctx context.Context, req *PublishItemRequest) (*PublishItemResponse, error) {

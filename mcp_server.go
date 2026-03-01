@@ -64,6 +64,39 @@ type SendMessageArgs struct {
 	Force       bool   `json:"force,omitempty" jsonschema:"是否忽略会话锁/人工模式强制发送"`
 }
 
+type UpsertIMKnowledgeArgs struct {
+	ID            string   `json:"id,omitempty" jsonschema:"知识ID，更新时传入；留空则新建"`
+	Title         string   `json:"title,omitempty" jsonschema:"知识标题（可选）"`
+	Keywords      []string `json:"keywords" jsonschema:"触发关键词列表（至少1个）"`
+	Answer        string   `json:"answer" jsonschema:"标准回复内容"`
+	ItemRef       string   `json:"item_ref,omitempty" jsonschema:"商品上下文（可选，支持商品标题片段或商品ref）"`
+	OrderStatuses []string `json:"order_statuses,omitempty" jsonschema:"适用订单状态：未下单|已拍下|我已发货|已收货"`
+	Tags          []string `json:"tags,omitempty" jsonschema:"标签（可选）"`
+	Enabled       *bool    `json:"enabled,omitempty" jsonschema:"是否启用，默认 true"`
+	Priority      int      `json:"priority,omitempty" jsonschema:"优先级，越大越优先"`
+}
+
+type ListIMKnowledgeArgs struct {
+	ItemRef     string `json:"item_ref,omitempty" jsonschema:"按商品上下文过滤（可选）"`
+	OrderStatus string `json:"order_status,omitempty" jsonschema:"按订单状态过滤（可选）"`
+	Query       string `json:"query,omitempty" jsonschema:"按关键词/标题/答案模糊过滤（可选）"`
+	Enabled     *bool  `json:"enabled,omitempty" jsonschema:"是否仅返回启用/禁用知识（可选）"`
+	Limit       int    `json:"limit,omitempty" jsonschema:"返回条数限制，默认100"`
+}
+
+type DeleteIMKnowledgeArgs struct {
+	ID string `json:"id" jsonschema:"知识ID"`
+}
+
+type MatchIMKnowledgeArgs struct {
+	Message     string `json:"message" jsonschema:"待回复的用户消息"`
+	Username    string `json:"username,omitempty" jsonschema:"会话用户名（可选）"`
+	ItemRef     string `json:"item_ref,omitempty" jsonschema:"商品上下文（可选）"`
+	OrderStatus string `json:"order_status,omitempty" jsonschema:"订单状态（可选）"`
+	TopK        int    `json:"top_k,omitempty" jsonschema:"返回候选条数，默认3，最大20"`
+	AutoContext bool   `json:"auto_context,omitempty" jsonschema:"是否按 username 自动补全商品与状态上下文"`
+}
+
 type PublishItemArgs struct {
 	Images            []string `json:"images" jsonschema:"本地图片绝对路径列表（至少1张）"`
 	Description       string   `json:"description" jsonschema:"宝贝描述（网页必填）"`
@@ -430,6 +463,95 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 				ClientMsgID: args.ClientMsgID,
 				MaxRetries:  args.MaxRetries,
 				Force:       args.Force,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "upsert_im_knowledge",
+			Description: "创建或更新智能客服知识条目（关键词、标准回复、商品/订单状态上下文）",
+			Annotations: &mcp.ToolAnnotations{Title: "Upsert IM Knowledge", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("upsert_im_knowledge", func(ctx context.Context, req *mcp.CallToolRequest, args UpsertIMKnowledgeArgs) (*mcp.CallToolResult, any, error) {
+			if len(args.Keywords) == 0 || strings.TrimSpace(args.Answer) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 keywords 或 answer 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleUpsertIMKnowledge(ctx, UpsertIMKnowledgeRequest{
+				ID:            args.ID,
+				Title:         args.Title,
+				Keywords:      args.Keywords,
+				Answer:        args.Answer,
+				ItemRef:       args.ItemRef,
+				OrderStatuses: args.OrderStatuses,
+				Tags:          args.Tags,
+				Enabled:       args.Enabled,
+				Priority:      args.Priority,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "list_im_knowledge",
+			Description: "读取智能客服知识条目列表（支持商品、状态、关键词、启用状态过滤）",
+			Annotations: &mcp.ToolAnnotations{Title: "List IM Knowledge", ReadOnlyHint: true},
+		},
+		withPanicRecovery("list_im_knowledge", func(ctx context.Context, req *mcp.CallToolRequest, args ListIMKnowledgeArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleListIMKnowledge(ctx, ListIMKnowledgeRequest{
+				ItemRef:     args.ItemRef,
+				OrderStatus: args.OrderStatus,
+				Query:       args.Query,
+				Enabled:     args.Enabled,
+				Limit:       args.Limit,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "delete_im_knowledge",
+			Description: "删除智能客服知识条目",
+			Annotations: &mcp.ToolAnnotations{Title: "Delete IM Knowledge", DestructiveHint: boolPtr(true)},
+		},
+		withPanicRecovery("delete_im_knowledge", func(ctx context.Context, req *mcp.CallToolRequest, args DeleteIMKnowledgeArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.ID) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 id 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleDeleteIMKnowledge(ctx, DeleteIMKnowledgeRequest{ID: args.ID})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "match_im_knowledge",
+			Description: "按用户消息匹配知识库，返回候选回复和最佳答案",
+			Annotations: &mcp.ToolAnnotations{Title: "Match IM Knowledge", ReadOnlyHint: true},
+		},
+		withPanicRecovery("match_im_knowledge", func(ctx context.Context, req *mcp.CallToolRequest, args MatchIMKnowledgeArgs) (*mcp.CallToolResult, any, error) {
+			if strings.TrimSpace(args.Message) == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 message 参数"}},
+				}, nil, nil
+			}
+			result := appServer.handleMatchIMKnowledge(ctx, MatchIMKnowledgeRequest{
+				Message:     args.Message,
+				Username:    args.Username,
+				ItemRef:     args.ItemRef,
+				OrderStatus: args.OrderStatus,
+				TopK:        args.TopK,
+				AutoContext: args.AutoContext,
 			})
 			return convertToMCPResult(result), nil, nil
 		}),
@@ -867,7 +989,7 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 36 MCP tools")
+	logrus.Info("Registered 40 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {

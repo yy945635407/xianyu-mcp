@@ -316,6 +316,95 @@ func (s *AppServer) sendMessageHandler(c *gin.Context) {
 	respondSuccess(c, result, "发送消息成功")
 }
 
+func (s *AppServer) upsertIMKnowledgeHandler(c *gin.Context) {
+	var req UpsertIMKnowledgeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+
+	result, err := s.xianyuService.UpsertIMKnowledge(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "UPSERT_IM_KNOWLEDGE_FAILED", "保存知识库失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "保存知识库成功")
+}
+
+func (s *AppServer) listIMKnowledgeHandler(c *gin.Context) {
+	var req ListIMKnowledgeRequest
+	req.ItemRef = c.Query("item_ref")
+	req.OrderStatus = c.Query("order_status")
+	req.Query = c.Query("query")
+
+	if limitStr := c.Query("limit"); limitStr != "" {
+		v, err := strconv.Atoi(limitStr)
+		if err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "limit 必须是整数", err.Error())
+			return
+		}
+		req.Limit = v
+	}
+	if enabledStr := c.Query("enabled"); enabledStr != "" {
+		v, err := strconv.ParseBool(enabledStr)
+		if err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_ENABLED", "enabled 必须是 true/false", err.Error())
+			return
+		}
+		req.Enabled = &v
+	}
+
+	result, err := s.xianyuService.ListIMKnowledge(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "LIST_IM_KNOWLEDGE_FAILED", "读取知识库失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "读取知识库成功")
+}
+
+func (s *AppServer) deleteIMKnowledgeHandler(c *gin.Context) {
+	var req DeleteIMKnowledgeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+
+	result, err := s.xianyuService.DeleteIMKnowledge(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "DELETE_IM_KNOWLEDGE_FAILED", "删除知识库失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "删除知识库成功")
+}
+
+func (s *AppServer) matchIMKnowledgeHandler(c *gin.Context) {
+	var req MatchIMKnowledgeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+		return
+	}
+
+	if strings.TrimSpace(req.Message) == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_MESSAGE", "缺少消息参数", "message is required")
+		return
+	}
+
+	result, err := s.xianyuService.MatchIMKnowledge(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "MATCH_IM_KNOWLEDGE_FAILED", "知识库匹配失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "知识库匹配成功")
+}
+
 func (s *AppServer) publishItemHandler(c *gin.Context) {
 	var req PublishItemRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -133,6 +133,74 @@ type IMSessionStatesResponse struct {
 	States []IMSessionState `json:"states"`
 }
 
+type UpsertIMKnowledgeRequest struct {
+	ID            string   `json:"id,omitempty"`
+	Title         string   `json:"title,omitempty"`
+	Keywords      []string `json:"keywords" binding:"required,min=1"`
+	Answer        string   `json:"answer" binding:"required"`
+	ItemRef       string   `json:"item_ref,omitempty"`
+	OrderStatuses []string `json:"order_statuses,omitempty"` // 未下单|已拍下|我已发货|已收货
+	Tags          []string `json:"tags,omitempty"`
+	Enabled       *bool    `json:"enabled,omitempty"`
+	Priority      int      `json:"priority,omitempty"`
+}
+
+type ListIMKnowledgeRequest struct {
+	ItemRef     string `json:"item_ref,omitempty"`
+	OrderStatus string `json:"order_status,omitempty"`
+	Query       string `json:"query,omitempty"`
+	Enabled     *bool  `json:"enabled,omitempty"`
+	Limit       int    `json:"limit,omitempty"`
+}
+
+type DeleteIMKnowledgeRequest struct {
+	ID string `json:"id" binding:"required"`
+}
+
+type MatchIMKnowledgeRequest struct {
+	Message     string `json:"message" binding:"required"`
+	Username    string `json:"username,omitempty"`
+	ItemRef     string `json:"item_ref,omitempty"`
+	OrderStatus string `json:"order_status,omitempty"`
+	TopK        int    `json:"top_k,omitempty"`
+	AutoContext bool   `json:"auto_context,omitempty"`
+}
+
+type IMKnowledgeEntryResponse struct {
+	Entry IMKnowledgeEntry `json:"entry"`
+}
+
+type IMKnowledgeListResponse struct {
+	Count   int                `json:"count"`
+	Entries []IMKnowledgeEntry `json:"entries"`
+}
+
+type DeleteIMKnowledgeResponse struct {
+	ID      string `json:"id"`
+	Deleted bool   `json:"deleted"`
+}
+
+type IMKnowledgeMatch struct {
+	ID              string   `json:"id"`
+	Title           string   `json:"title,omitempty"`
+	Answer          string   `json:"answer"`
+	ItemRef         string   `json:"item_ref,omitempty"`
+	OrderStatuses   []string `json:"order_statuses,omitempty"`
+	Tags            []string `json:"tags,omitempty"`
+	Score           int      `json:"score"`
+	MatchedKeywords []string `json:"matched_keywords,omitempty"`
+}
+
+type MatchIMKnowledgeResponse struct {
+	Message     string             `json:"message"`
+	Username    string             `json:"username,omitempty"`
+	ItemRef     string             `json:"item_ref,omitempty"`
+	OrderStatus string             `json:"order_status,omitempty"`
+	Count       int                `json:"count"`
+	BestAnswer  string             `json:"best_answer,omitempty"`
+	Matches     []IMKnowledgeMatch `json:"matches"`
+}
+
 type PublishItemRequest struct {
 	Images            []string `json:"images" binding:"required,min=1"`
 	Description       string   `json:"description" binding:"required"`
