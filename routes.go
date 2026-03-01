@@ -34,6 +34,8 @@ func setupRoutes(appServer *AppServer) *gin.Engine {
 		api.GET("/login/status", appServer.checkLoginStatusHandler)
 		api.GET("/login/qrcode", appServer.getLoginQrcodeHandler)
 		api.DELETE("/login/cookies", appServer.deleteCookiesHandler)
+		api.GET("/search", appServer.searchItemsHandler)
+		api.POST("/search", appServer.searchItemsHandler)
 	}
 
 	return router

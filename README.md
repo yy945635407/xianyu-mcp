@@ -7,6 +7,7 @@
 - `check_login_status`：检查闲鱼登录状态
 - `get_login_qrcode`：获取登录二维码
 - `delete_cookies`：清理 cookies 重置登录
+- `search_items`：按关键词搜索商品摘要
 - HTTP API 与 MCP Streamable HTTP 双入口
 
 ## 快速开始
@@ -22,6 +23,12 @@ go run . -headless=false -port=:18061
 ```
 
 MCP 地址：`http://localhost:18061/mcp`
+
+搜索接口示例：
+
+```bash
+curl 'http://localhost:18061/api/v1/search?keyword=iphone&limit=5'
+```
 
 ## 浏览器探索调试
 

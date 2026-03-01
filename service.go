@@ -96,6 +96,42 @@ func (s *XianyuService) GetLoginQrcode(ctx context.Context) (*LoginQrcodeRespons
 	}, nil
 }
 
+func (s *XianyuService) SearchItems(ctx context.Context, keyword string, limit int) (*SearchItemsResponse, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	b := newBrowser()
+	defer b.Close()
+
+	page := b.NewPage()
+	defer page.Close()
+
+	action := xianyu.NewSearchAction(page)
+	items, err := action.Search(ctx, keyword, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	respItems := make([]SearchItemResponse, 0, len(items))
+	for _, item := range items {
+		respItems = append(respItems, SearchItemResponse{
+			ID:        item.ID,
+			Title:     item.Title,
+			Price:     item.Price,
+			WantCount: item.WantCount,
+			URL:       item.URL,
+			Seller:    item.Seller,
+		})
+	}
+
+	return &SearchItemsResponse{
+		Keyword: keyword,
+		Count:   len(respItems),
+		Items:   respItems,
+	}, nil
+}
+
 func newBrowser() *headless_browser.Browser {
 	return browser.NewBrowser(configs.IsHeadless(), browser.WithBinPath(configs.GetBinPath()))
 }

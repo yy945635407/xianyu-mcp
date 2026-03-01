@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -74,6 +75,28 @@ func (s *AppServer) handleDeleteCookies(ctx context.Context) *MCPToolResult {
 		Type: "text",
 		Text: fmt.Sprintf("Cookies 已成功删除，登录状态已重置。\n\n删除路径: %s", cookiePath),
 	}}}
+}
+
+func (s *AppServer) handleSearchItems(ctx context.Context, keyword string, limit int) *MCPToolResult {
+	result, err := s.xianyuService.SearchItems(ctx, keyword, limit)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "搜索商品失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "搜索成功但结果序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	return &MCPToolResult{
+		Content: []MCPContent{{Type: "text", Text: string(data)}},
+	}
 }
 
 func normalizeQRCodeData(img string) string {

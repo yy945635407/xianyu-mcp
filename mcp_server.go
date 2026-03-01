@@ -12,6 +12,11 @@ import (
 
 func boolPtr(b bool) *bool { return &b }
 
+type SearchItemsArgs struct {
+	Keyword string `json:"keyword" jsonschema:"搜索关键词"`
+	Limit   int    `json:"limit,omitempty" jsonschema:"返回条数限制，默认20，最大100"`
+}
+
 func InitMCPServer(appServer *AppServer) *mcp.Server {
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -84,7 +89,26 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Info("Registered 3 MCP tools")
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "search_items",
+			Description: "搜索闲鱼商品，返回商品摘要列表",
+			Annotations: &mcp.ToolAnnotations{Title: "Search Items", ReadOnlyHint: true},
+		},
+		withPanicRecovery("search_items", func(ctx context.Context, req *mcp.CallToolRequest, args SearchItemsArgs) (*mcp.CallToolResult, any, error) {
+			if args.Keyword == "" {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: "缺少 keyword 参数"}},
+				}, nil, nil
+			}
+
+			result := appServer.handleSearchItems(ctx, args.Keyword, args.Limit)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	logrus.Info("Registered 4 MCP tools")
 }
 
 func convertToMCPResult(result *MCPToolResult) *mcp.CallToolResult {

@@ -34,3 +34,23 @@ type LoginQrcodeResponse struct {
 	IsLoggedIn bool   `json:"is_logged_in"`
 	Img        string `json:"img,omitempty"`
 }
+
+type SearchItemsRequest struct {
+	Keyword string `json:"keyword" binding:"required"`
+	Limit   int    `json:"limit,omitempty"`
+}
+
+type SearchItemResponse struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Price     string `json:"price,omitempty"`
+	WantCount int    `json:"want_count,omitempty"`
+	URL       string `json:"url"`
+	Seller    string `json:"seller,omitempty"`
+}
+
+type SearchItemsResponse struct {
+	Keyword string               `json:"keyword"`
+	Count   int                  `json:"count"`
+	Items   []SearchItemResponse `json:"items"`
+}

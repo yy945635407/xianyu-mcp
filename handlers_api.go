@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -64,6 +65,42 @@ func (s *AppServer) deleteCookiesHandler(c *gin.Context) {
 		"cookie_path": cookiePath,
 		"message":     "Cookies 已成功删除，登录状态已重置。",
 	}, "删除 cookies 成功")
+}
+
+func (s *AppServer) searchItemsHandler(c *gin.Context) {
+	var req SearchItemsRequest
+
+	switch c.Request.Method {
+	case http.MethodPost:
+		if err := c.ShouldBindJSON(&req); err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+			return
+		}
+	default:
+		req.Keyword = c.Query("keyword")
+		if limitStr := c.Query("limit"); limitStr != "" {
+			limit, err := strconv.Atoi(limitStr)
+			if err != nil {
+				respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "limit 必须是整数", err.Error())
+				return
+			}
+			req.Limit = limit
+		}
+	}
+
+	if req.Keyword == "" {
+		respondError(c, http.StatusBadRequest, "MISSING_KEYWORD", "缺少关键词参数", "keyword is required")
+		return
+	}
+
+	result, err := s.xianyuService.SearchItems(c.Request.Context(), req.Keyword, req.Limit)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "SEARCH_ITEMS_FAILED", "搜索商品失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "搜索商品成功")
 }
 
 func healthHandler(c *gin.Context) {
