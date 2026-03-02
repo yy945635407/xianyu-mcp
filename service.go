@@ -427,6 +427,81 @@ func (s *XianyuService) PullIMEvents(ctx context.Context, req *PullIMEventsReque
 	}, nil
 }
 
+func (s *XianyuService) WaitIMEvents(ctx context.Context, req *WaitIMEventsRequest) (*WaitIMEventsResponse, error) {
+	if req == nil {
+		req = &WaitIMEventsRequest{}
+	}
+
+	timeoutSec := req.TimeoutSec
+	if timeoutSec <= 0 || timeoutSec > 180 {
+		timeoutSec = 30
+	}
+	pollMs := req.PollMs
+	if pollMs <= 0 || pollMs > 10000 {
+		pollMs = 1200
+	}
+	if pollMs < 200 {
+		pollMs = 200
+	}
+
+	start := time.Now()
+	deadline := start.Add(time.Duration(timeoutSec) * time.Second)
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		pullResp, err := s.PullIMEvents(ctx, &PullIMEventsRequest{
+			SinceID:   req.SinceID,
+			Limit:     req.Limit,
+			ScanLimit: req.ScanLimit,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		waited := time.Since(start).Milliseconds()
+		if pullResp.Count > 0 {
+			return &WaitIMEventsResponse{
+				SinceID:    pullResp.SinceID,
+				NextCursor: pullResp.NextCursor,
+				Generated:  pullResp.Generated,
+				Count:      pullResp.Count,
+				Events:     pullResp.Events,
+				WaitedMs:   waited,
+				Timeout:    false,
+			}, nil
+		}
+
+		if time.Now().After(deadline) {
+			return &WaitIMEventsResponse{
+				SinceID:    pullResp.SinceID,
+				NextCursor: pullResp.NextCursor,
+				Generated:  pullResp.Generated,
+				Count:      pullResp.Count,
+				Events:     pullResp.Events,
+				WaitedMs:   waited,
+				Timeout:    true,
+			}, nil
+		}
+
+		waitDuration := time.Duration(pollMs) * time.Millisecond
+		if remain := time.Until(deadline); remain < waitDuration {
+			waitDuration = remain
+		}
+		timer := time.NewTimer(waitDuration)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
 func (s *XianyuService) GetIMSessionState(ctx context.Context, username string) (*IMSessionStateResponse, error) {
 	store, err := getIMSessionStore()
 	if err != nil {

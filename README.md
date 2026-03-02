@@ -59,6 +59,9 @@ curl -X POST 'http://localhost:18061/api/v1/im/send' \
 # 增量事件流
 curl 'http://localhost:18061/api/v1/im/events?since_id=0&limit=50'
 
+# 阻塞等待增量事件（准事件驱动）
+curl 'http://localhost:18061/api/v1/im/events/wait?since_id=0&limit=50&timeout_sec=30&poll_ms=1200'
+
 # 会话状态
 curl -X POST 'http://localhost:18061/api/v1/im/session/state' \
   -H 'Content-Type: application/json' \

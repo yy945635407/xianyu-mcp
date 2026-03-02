@@ -81,6 +81,14 @@ type PullIMEventsRequest struct {
 	ScanLimit int   `json:"scan_limit,omitempty"`
 }
 
+type WaitIMEventsRequest struct {
+	SinceID    int64 `json:"since_id,omitempty"`
+	Limit      int   `json:"limit,omitempty"`
+	ScanLimit  int   `json:"scan_limit,omitempty"`
+	TimeoutSec int   `json:"timeout_sec,omitempty"`
+	PollMs     int   `json:"poll_ms,omitempty"`
+}
+
 type ListConversationsResponse struct {
 	Count         int                          `json:"count"`
 	Conversations []xianyu.ConversationSummary `json:"conversations"`
@@ -108,6 +116,16 @@ type PullIMEventsResponse struct {
 	Generated  int       `json:"generated"`
 	Count      int       `json:"count"`
 	Events     []IMEvent `json:"events"`
+}
+
+type WaitIMEventsResponse struct {
+	SinceID    int64     `json:"since_id"`
+	NextCursor int64     `json:"next_cursor"`
+	Generated  int       `json:"generated"`
+	Count      int       `json:"count"`
+	Events     []IMEvent `json:"events"`
+	WaitedMs   int64     `json:"waited_ms"`
+	Timeout    bool      `json:"timeout"`
 }
 
 type SetIMSessionStateRequest struct {

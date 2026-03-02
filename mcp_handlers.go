@@ -156,6 +156,25 @@ func (s *AppServer) handlePullIMEvents(ctx context.Context, req PullIMEventsRequ
 	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
 }
 
+func (s *AppServer) handleWaitIMEvents(ctx context.Context, req WaitIMEventsRequest) *MCPToolResult {
+	result, err := s.xianyuService.WaitIMEvents(ctx, &req)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "等待增量消息失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "等待成功但序列化失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return &MCPToolResult{Content: []MCPContent{{Type: "text", Text: string(data)}}}
+}
+
 func (s *AppServer) handleGetIMSessionState(ctx context.Context, username string) *MCPToolResult {
 	result, err := s.xianyuService.GetIMSessionState(ctx, username)
 	if err != nil {

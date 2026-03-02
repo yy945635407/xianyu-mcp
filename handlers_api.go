@@ -207,6 +207,68 @@ func (s *AppServer) pullIMEventsHandler(c *gin.Context) {
 	respondSuccess(c, result, "拉取增量消息成功")
 }
 
+func (s *AppServer) waitIMEventsHandler(c *gin.Context) {
+	var req WaitIMEventsRequest
+
+	switch c.Request.Method {
+	case http.MethodPost:
+		if err := c.ShouldBindJSON(&req); err != nil {
+			respondError(c, http.StatusBadRequest, "INVALID_REQUEST", "请求参数错误", err.Error())
+			return
+		}
+	default:
+		if sinceIDStr := c.Query("since_id"); sinceIDStr != "" {
+			v, err := strconv.ParseInt(sinceIDStr, 10, 64)
+			if err != nil {
+				respondError(c, http.StatusBadRequest, "INVALID_SINCE_ID", "since_id 必须是整数", err.Error())
+				return
+			}
+			req.SinceID = v
+		}
+		if limitStr := c.Query("limit"); limitStr != "" {
+			v, err := strconv.Atoi(limitStr)
+			if err != nil {
+				respondError(c, http.StatusBadRequest, "INVALID_LIMIT", "limit 必须是整数", err.Error())
+				return
+			}
+			req.Limit = v
+		}
+		if scanStr := c.Query("scan_limit"); scanStr != "" {
+			v, err := strconv.Atoi(scanStr)
+			if err != nil {
+				respondError(c, http.StatusBadRequest, "INVALID_SCAN_LIMIT", "scan_limit 必须是整数", err.Error())
+				return
+			}
+			req.ScanLimit = v
+		}
+		if timeoutStr := c.Query("timeout_sec"); timeoutStr != "" {
+			v, err := strconv.Atoi(timeoutStr)
+			if err != nil {
+				respondError(c, http.StatusBadRequest, "INVALID_TIMEOUT_SEC", "timeout_sec 必须是整数", err.Error())
+				return
+			}
+			req.TimeoutSec = v
+		}
+		if pollMsStr := c.Query("poll_ms"); pollMsStr != "" {
+			v, err := strconv.Atoi(pollMsStr)
+			if err != nil {
+				respondError(c, http.StatusBadRequest, "INVALID_POLL_MS", "poll_ms 必须是整数", err.Error())
+				return
+			}
+			req.PollMs = v
+		}
+	}
+
+	result, err := s.xianyuService.WaitIMEvents(c.Request.Context(), &req)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, "WAIT_IM_EVENTS_FAILED", "等待增量消息失败", err.Error())
+		return
+	}
+
+	c.Set("account", "xianyu-mcp")
+	respondSuccess(c, result, "等待增量消息成功")
+}
+
 func (s *AppServer) getIMSessionStateHandler(c *gin.Context) {
 	username := c.Query("username")
 	if strings.TrimSpace(username) == "" {

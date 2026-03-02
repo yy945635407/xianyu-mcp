@@ -41,6 +41,8 @@ func setupRoutes(appServer *AppServer) *gin.Engine {
 		api.POST("/im/messages", appServer.getMessagesHandler)
 		api.GET("/im/events", appServer.pullIMEventsHandler)
 		api.POST("/im/events", appServer.pullIMEventsHandler)
+		api.GET("/im/events/wait", appServer.waitIMEventsHandler)
+		api.POST("/im/events/wait", appServer.waitIMEventsHandler)
 		api.GET("/im/session/state", appServer.getIMSessionStateHandler)
 		api.GET("/im/session/states", appServer.listIMSessionStatesHandler)
 		api.POST("/im/session/state", appServer.setIMSessionStateHandler)

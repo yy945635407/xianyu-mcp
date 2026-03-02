@@ -67,6 +67,7 @@ go run . -headless=false -port=:18061
 - `list_conversations`
 - `get_messages`（必填：`username`）
 - `pull_im_events`
+- `wait_im_events`（阻塞等待增量事件，准事件驱动）
 - `get_im_session_state`（必填：`username`）
 - `list_im_session_states`
 - `set_im_session_state`（必填：`username`）
@@ -177,6 +178,12 @@ go run . -headless=false -port=:18061
 curl 'http://127.0.0.1:18061/api/v1/im/events?since_id=0&limit=50&scan_limit=30'
 ```
 
+### 6.1.1 阻塞等待增量（推荐给守护进程）
+
+```bash
+curl 'http://127.0.0.1:18061/api/v1/im/events/wait?since_id=0&limit=50&scan_limit=30&timeout_sec=30&poll_ms=1200'
+```
+
 ### 6.2 发送消息
 
 ```bash
@@ -222,4 +229,3 @@ curl -X POST 'http://127.0.0.1:18061/api/v1/im/kb/match' \
 3. 每个事件最多发送一次（事件去重 + `client_msg_id` 幂等）
 4. 发送失败累计阈值后切 `human`，防止失控
 5. 全流程写审计日志，便于回放
-

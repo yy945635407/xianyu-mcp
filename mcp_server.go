@@ -33,6 +33,14 @@ type PullIMEventsArgs struct {
 	ScanLimit int   `json:"scan_limit,omitempty" jsonschema:"扫描会话条数限制，默认30"`
 }
 
+type WaitIMEventsArgs struct {
+	SinceID    int64 `json:"since_id,omitempty" jsonschema:"游标ID，只返回大于该ID的增量事件"`
+	Limit      int   `json:"limit,omitempty" jsonschema:"返回事件条数限制，默认100"`
+	ScanLimit  int   `json:"scan_limit,omitempty" jsonschema:"扫描会话条数限制，默认30"`
+	TimeoutSec int   `json:"timeout_sec,omitempty" jsonschema:"最长等待秒数，默认30，最大180"`
+	PollMs     int   `json:"poll_ms,omitempty" jsonschema:"轮询检查间隔毫秒，默认1200，最小200"`
+}
+
 type GetIMSessionStateArgs struct {
 	Username string `json:"username" jsonschema:"会话用户名"`
 }
@@ -362,6 +370,24 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 				SinceID:   args.SinceID,
 				Limit:     args.Limit,
 				ScanLimit: args.ScanLimit,
+			})
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "wait_im_events",
+			Description: "阻塞等待 IM 增量事件（监听优先，超时返回）",
+			Annotations: &mcp.ToolAnnotations{Title: "Wait IM Events", ReadOnlyHint: true},
+		},
+		withPanicRecovery("wait_im_events", func(ctx context.Context, req *mcp.CallToolRequest, args WaitIMEventsArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleWaitIMEvents(ctx, WaitIMEventsRequest{
+				SinceID:    args.SinceID,
+				Limit:      args.Limit,
+				ScanLimit:  args.ScanLimit,
+				TimeoutSec: args.TimeoutSec,
+				PollMs:     args.PollMs,
 			})
 			return convertToMCPResult(result), nil, nil
 		}),
